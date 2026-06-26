@@ -71,6 +71,7 @@ export const implementationUpdateSchema = z.object({
     ])
     .optional(),
   narrative: z.string().max(20000).optional(),
+  providerName: z.string().max(200).optional(),
   ownerId: z.string().nullable().optional(),
 });
 
@@ -203,6 +204,38 @@ export const aiDraftSchema = z.object({
   systemId: z.string(),
   implementationId: z.string().optional(),
   poamId: z.string().optional(),
+});
+
+// --- Assessment & Authorization ---
+export const ASSESSMENT_RESULTS = ["SATISFIED", "OTHER_THAN_SATISFIED", "NOT_APPLICABLE", "NOT_ASSESSED"] as const;
+export const AUTHORIZATION_DECISIONS = ["ATO", "ATO_WITH_CONDITIONS", "IATT", "DENIED", "REVOKED"] as const;
+
+export const assessmentCreateSchema = z.object({
+  systemId: z.string(),
+  title: z.string().min(2).max(200),
+  assessorName: z.string().max(200).optional(),
+});
+
+export const assessmentUpdateSchema = z.object({
+  status: z.enum(["DRAFT", "IN_PROGRESS", "COMPLETED"]).optional(),
+  summary: z.string().max(8000).optional(),
+  assessorName: z.string().max(200).optional(),
+});
+
+export const assessmentResultUpdateSchema = z.object({
+  result: z.enum(ASSESSMENT_RESULTS).optional(),
+  findings: z.string().max(8000).optional(),
+  recommendation: z.string().max(8000).optional(),
+});
+
+export const authorizationCreateSchema = z.object({
+  systemId: z.string(),
+  decision: z.enum(AUTHORIZATION_DECISIONS),
+  authorizingOfficial: z.string().min(2).max(200),
+  decisionDate: z.string().optional(), // ISO date; defaults to now
+  expiresAt: z.string().optional(),
+  rationale: z.string().max(8000).optional(),
+  conditions: z.string().max(8000).optional(),
 });
 
 export const aiChatSchema = z.object({

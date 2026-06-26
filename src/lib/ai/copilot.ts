@@ -165,6 +165,20 @@ function renderSar(d: SystemDossier, exec: string): string {
   out.push(`- **System:** ${d.system.name} (FIPS ${d.system.fipsCategory})`);
   out.push(`- **Controls assessed:** ${d.score.controlsApplicable} applicable`);
   out.push(`- **Frameworks:** ${d.system.frameworks.join(", ") || "—"}\n`);
+
+  if (d.assessment) {
+    const a = d.assessment;
+    out.push(`## 2a. Security Control Assessment Results`);
+    out.push(`- **Assessment:** ${a.title}${a.completedAt ? ` (completed ${a.completedAt})` : ""}`);
+    out.push(`- **Assessor:** ${a.assessorName || "—"}`);
+    out.push(`- **Results:** ${a.satisfied} satisfied · ${a.otherThanSatisfied} other than satisfied · ${a.notApplicable} not applicable`);
+    if (a.findings.length) {
+      out.push(`\n**Other-than-satisfied controls:**`);
+      out.push(a.findings.map((f) => `- ${f.controlId}: ${f.findings || "(no finding text)"}${f.recommendation ? ` — _rec:_ ${f.recommendation}` : ""}`).join("\n"));
+    }
+    out.push("");
+  }
+
   out.push(`## 3. Findings & Gaps`);
   if (gaps.length) {
     for (const g of gaps) {
