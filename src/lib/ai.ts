@@ -21,39 +21,55 @@ const SYSTEM_PROMPT =
   "control identifiers, dates, or assessment results. Output is a DRAFT for human review and must never " +
   "be presented as a final authorization decision.";
 
-async function generate(prompt: string, stub: string): Promise<DraftResult> {
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+/**
+ * Low-level completion used by every AI feature. When no API key is configured (or the call
+ * fails) it returns the provided `stub` so the product stays fully usable offline. `system`
+ * defaults to the compliance-analyst guardrail prompt.
+ */
+export async function aiComplete(opts: {
+  messages: ChatMessage[];
+  stub: string;
+  system?: string;
+  maxTokens?: number;
+}): Promise<DraftResult> {
   const anthropic = client();
   if (!anthropic) {
     return {
-      text: stub,
+      text: opts.stub,
       isDraft: true,
       source: "stub",
       notice:
-        "ANTHROPIC_API_KEY is not set — this is a templated placeholder, not Claude output. Set the key to enable AI drafting.",
+        "ANTHROPIC_API_KEY is not set — this is a templated placeholder, not Claude output. Set the key to enable AI features.",
     };
   }
   try {
     const msg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 1200,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: prompt }],
+      max_tokens: opts.maxTokens ?? 1200,
+      system: opts.system ?? SYSTEM_PROMPT,
+      messages: opts.messages,
     });
     const text = msg.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("\n")
       .trim();
-    return { text: text || stub, isDraft: true, source: "claude" };
+    return { text: text || opts.stub, isDraft: true, source: "claude" };
   } catch (err) {
-    console.error("AI draft failed", err);
+    console.error("AI request failed", err);
     return {
-      text: stub,
+      text: opts.stub,
       isDraft: true,
       source: "stub",
       notice: "Claude request failed — showing a templated placeholder. Check the API key and try again.",
     };
   }
+}
+
+function generate(prompt: string, stub: string): Promise<DraftResult> {
+  return aiComplete({ messages: [{ role: "user", content: prompt }], stub });
 }
 
 export function draftControlNarrative(input: {

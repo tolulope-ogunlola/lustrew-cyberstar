@@ -47,6 +47,7 @@ export async function PATCH(
         scoping: body.scoping,
         status: body.status,
         narrative: body.narrative,
+        providerName: body.providerName,
         ownerId: body.ownerId === undefined ? undefined : body.ownerId,
       },
     });

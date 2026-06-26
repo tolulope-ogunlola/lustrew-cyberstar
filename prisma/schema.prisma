@@ -51,6 +51,7 @@ model User {
   ownedPoams       Poam[]                  @relation("PoamOwner")
   ownedRisks       Risk[]                  @relation("RiskOwner")
   uploadedEvidence Evidence[]              @relation("EvidenceUploader")
+  signedAuthorizations AuthorizationDecision[] @relation("AuthorizationSigner")
   auditEvents      AuditEvent[]
 
   @@index([orgId])
@@ -84,6 +85,9 @@ model System {
   stigFindings    StigFinding[]
   ppsmEntries     PpsmEntry[]
   metricSnapshots MetricSnapshot[]
+  assessments     Assessment[]
+  authorizations  AuthorizationDecision[]
+  assets          Asset[]
 
   @@index([orgId])
 }
@@ -94,11 +98,12 @@ model System {
 
 model Control {
   id        String @id @default(cuid())
-  controlId String @unique // e.g. "AC-2"
-  family    String // e.g. "AC"
+  controlId String @unique // e.g. "AC-2" (800-53) or "3.1.1" (800-171)
+  family    String // e.g. "AC" or "3.1"
   title     String
   text      String
   baseline  String @default("MODERATE") // LOW | MODERATE | HIGH
+  framework String @default("NIST_800_53") // NIST_800_53 | NIST_800_171
 
   implementations ControlImplementation[]
 
@@ -106,10 +111,11 @@ model Control {
 }
 
 model ControlImplementation {
-  id        String   @id @default(cuid())
-  scoping   String   @default("APPLICABLE") // APPLICABLE | NOT_APPLICABLE | INHERITED | HYBRID | COMPENSATING
-  status    String   @default("NOT_IMPLEMENTED") // NOT_IMPLEMENTED | PLANNED | PARTIALLY_IMPLEMENTED | IMPLEMENTED | RISK_ACCEPTED
-  narrative String   @default("")
+  id           String   @id @default(cuid())
+  scoping      String   @default("APPLICABLE") // APPLICABLE | NOT_APPLICABLE | INHERITED | HYBRID | COMPENSATING
+  status       String   @default("NOT_IMPLEMENTED") // NOT_IMPLEMENTED | PLANNED | PARTIALLY_IMPLEMENTED | IMPLEMENTED | RISK_ACCEPTED
+  narrative    String   @default("")
+  providerName String   @default("") // common control provider when scoping is INHERITED/HYBRID (e.g. "AWS GovCloud")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -515,4 +521,79 @@ model AuditEvent {
   actor   User?   @relation(fields: [actorId], references: [id])
 
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Assessment & Authorization (Security Control Assessment → SAR → AO decision)
+// ---------------------------------------------------------------------------
+
+model Assessment {
+  id           String    @id @default(cuid())
+  title        String
+  assessorName String    @default("")
+  status       String    @default("DRAFT") // DRAFT | IN_PROGRESS | COMPLETED
+  summary      String    @default("")
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  results ControlAssessmentResult[]
+
+  @@index([systemId])
+}
+
+model ControlAssessmentResult {
+  id             String   @id @default(cuid())
+  controlId      String // 800-53 control id snapshot, e.g. "AC-2" (kept stable even if catalog changes)
+  controlTitle   String   @default("")
+  result         String   @default("NOT_ASSESSED") // SATISFIED | OTHER_THAN_SATISFIED | NOT_APPLICABLE | NOT_ASSESSED
+  findings       String   @default("")
+  recommendation String   @default("")
+  updatedAt      DateTime @updatedAt
+
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, controlId])
+  @@index([assessmentId])
+}
+
+// CMMC / 800-171 asset inventory & CUI boundary scoping.
+model Asset {
+  id          String   @id @default(cuid())
+  name        String
+  assetType   String   @default("Other") // Server | Workstation | Network | Cloud Service | Application | Mobile | Other
+  category    String   @default("OUT_OF_SCOPE") // CUI | SECURITY_PROTECTION | CONTRACTOR_RISK_MANAGED | SPECIALIZED | OUT_OF_SCOPE
+  description String   @default("")
+  owner       String   @default("")
+  location    String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@index([systemId])
+}
+
+model AuthorizationDecision {
+  id                  String    @id @default(cuid())
+  decision            String // ATO | ATO_WITH_CONDITIONS | IATT | DENIED | REVOKED
+  authorizingOfficial String
+  decisionDate        DateTime  @default(now())
+  expiresAt           DateTime?
+  rationale           String    @default("")
+  conditions          String    @default("")
+  createdAt           DateTime  @default(now())
+
+  systemId   String
+  system     System  @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  signedById String?
+  signedBy   User?   @relation("AuthorizationSigner", fields: [signedById], references: [id])
+
+  @@index([systemId])
 }

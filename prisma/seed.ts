@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { recordSnapshots } from "@/lib/metrics/snapshot";
+import { deriveResultFromStatus } from "@/lib/assessment";
 
 const prisma = new PrismaClient();
 
@@ -79,7 +80,7 @@ async function main() {
     users[u.role] = created.id;
   }
 
-  // --- Control catalog ---
+  // --- Control catalogs (NIST 800-53 + NIST 800-171) ---
   const controls: ControlSeed[] = JSON.parse(
     readFileSync(join(__dirname, "data", "nist-800-53-controls.json"), "utf8")
   );
@@ -90,9 +91,24 @@ async function main() {
       title: c.title,
       text: c.text,
       baseline: c.baseline,
+      framework: "NIST_800_53",
     })),
   });
-  const allControls = await prisma.control.findMany();
+  const controls171: { controlId: string; family: string; title: string; text: string }[] = JSON.parse(
+    readFileSync(join(__dirname, "data", "nist-800-171.json"), "utf8")
+  );
+  await prisma.control.createMany({
+    data: controls171.map((c) => ({
+      controlId: c.controlId,
+      family: c.family,
+      title: c.title,
+      text: c.text,
+      baseline: "MODERATE",
+      framework: "NIST_800_171",
+    })),
+  });
+  // 800-53 controls drive the RMF/53 demo systems below.
+  const allControls = await prisma.control.findMany({ where: { framework: "NIST_800_53" } });
 
   // --- Two systems with differing maturity ---
   const statuses = [
@@ -275,22 +291,21 @@ async function main() {
     return system;
   }
 
-  const seededSystems = [
-    await buildSystem({
-      name: "Atlas Cloud Platform",
-      description: "Primary multi-tenant SaaS platform pursuing a Moderate ATO.",
-      fips: "MODERATE",
-      frameworks: ["NIST_RMF", "NIST_800_53", "FISMA", "FEDRAMP_READY"],
-      maturityOffset: 0,
-    }),
-    await buildSystem({
-      name: "Helix Data Exchange",
-      description: "Inter-agency data exchange service in early authorization.",
-      fips: "HIGH",
-      frameworks: ["NIST_RMF", "NIST_800_53", "FISMA"],
-      maturityOffset: 2,
-    }),
-  ];
+  const atlas = await buildSystem({
+    name: "Atlas Cloud Platform",
+    description: "Primary multi-tenant SaaS platform pursuing a Moderate ATO.",
+    fips: "MODERATE",
+    frameworks: ["NIST_RMF", "NIST_800_53", "FISMA", "FEDRAMP_READY"],
+    maturityOffset: 0,
+  });
+  const helix = await buildSystem({
+    name: "Helix Data Exchange",
+    description: "Inter-agency data exchange service in early authorization.",
+    fips: "HIGH",
+    frameworks: ["NIST_RMF", "NIST_800_53", "FISMA"],
+    maturityOffset: 2,
+  });
+  const seededSystems = [atlas, helix];
 
   // --- 30 days of historical posture snapshots so dashboard trend charts render immediately ---
   // Today's row is the real computed posture; prior days trend gently upward toward it.
@@ -327,6 +342,93 @@ async function main() {
     }
   }
 
+  // --- Assessment & Authorization demo data (Atlas) ---
+  // Mark a couple of Atlas controls as inherited from a common control provider.
+  const atlasImpls = await prisma.controlImplementation.findMany({
+    where: { systemId: atlas.id, scoping: { not: "NOT_APPLICABLE" } },
+    include: { control: { select: { controlId: true, title: true } } },
+    orderBy: { control: { controlId: "asc" } },
+  });
+  for (const ci of atlasImpls.filter((i) => ["PE-1", "PE-2", "PE-3"].includes(i.control.controlId))) {
+    await prisma.controlImplementation.update({ where: { id: ci.id }, data: { scoping: "INHERITED", providerName: "AWS GovCloud" } });
+  }
+
+  // A completed Security Control Assessment with results derived from implementation status.
+  await prisma.assessment.create({
+    data: {
+      systemId: atlas.id,
+      title: "Annual Security Control Assessment 2026",
+      assessorName: "Independent Assessment Team",
+      status: "COMPLETED",
+      completedAt: new Date(),
+      summary: "Independent assessment of applicable controls; most satisfied with a small number of other-than-satisfied findings.",
+      results: {
+        create: atlasImpls.map((i) => ({
+          controlId: i.control.controlId,
+          controlTitle: i.control.title,
+          result: deriveResultFromStatus(i.status, i.scoping),
+          findings:
+            deriveResultFromStatus(i.status, i.scoping) === "OTHER_THAN_SATISFIED"
+              ? `${i.control.controlId} implementation is incomplete or lacks sufficient evidence.`
+              : "",
+          recommendation:
+            deriveResultFromStatus(i.status, i.scoping) === "OTHER_THAN_SATISFIED"
+              ? "Complete the implementation and attach validating evidence; track as a POA&M if remediation is deferred."
+              : "",
+        })),
+      },
+    },
+  });
+
+  // An ATO-with-conditions authorization decision.
+  await prisma.authorizationDecision.create({
+    data: {
+      systemId: atlas.id,
+      decision: "ATO_WITH_CONDITIONS",
+      authorizingOfficial: "Jordan Pierce, Authorizing Official",
+      decisionDate: new Date(),
+      expiresAt: daysFromNow(365),
+      rationale: "Residual risk is acceptable given compensating controls and the active POA&M remediation plan.",
+      conditions: "Close all overdue POA&Ms within 90 days; submit monthly continuous-monitoring reports.",
+      signedById: users.ADMIN,
+    },
+  });
+
+  // --- CMMC Level 2 contractor enclave (NIST 800-171) ---
+  const falcon = await prisma.system.create({
+    data: {
+      name: "Falcon Contractor Enclave",
+      description: "CUI enclave for a DoD subcontractor pursuing CMMC Level 2.",
+      fipsCategory: "MODERATE",
+      frameworks: JSON.stringify(["CMMC_L2", "NIST_800_171"]),
+      orgId: org.id,
+      ownerId: users.SYSTEM_OWNER,
+    },
+  });
+  await prisma.rmfStep.createMany({
+    data: (["PREPARE", "CATEGORIZE", "SELECT", "IMPLEMENT", "ASSESS", "AUTHORIZE", "MONITOR"] as const).map((s) => ({ systemId: falcon.id, step: s })),
+  });
+  const controls171Rows = await prisma.control.findMany({ where: { framework: "NIST_800_171" }, orderBy: { controlId: "asc" } });
+  await prisma.controlImplementation.createMany({
+    data: controls171Rows.map((c, i) => ({
+      systemId: falcon.id,
+      controlId: c.id,
+      // Deterministic spread: most implemented, some partial, some not implemented → SPRS < 110.
+      status: i % 7 === 0 ? "NOT_IMPLEMENTED" : i % 5 === 0 ? "PARTIALLY_IMPLEMENTED" : "IMPLEMENTED",
+      narrative: i % 7 === 0 ? "" : "Implemented via enclave baseline configuration and documented procedures.",
+    })),
+  });
+  await prisma.asset.createMany({
+    data: [
+      { systemId: falcon.id, name: "CUI File Server", assetType: "Server", category: "CUI", owner: "IT Ops", location: "Enclave VLAN" },
+      { systemId: falcon.id, name: "Engineering Workstations", assetType: "Workstation", category: "CUI", owner: "Engineering", location: "Enclave VLAN" },
+      { systemId: falcon.id, name: "Microsoft GCC High (M365)", assetType: "Cloud Service", category: "CUI", owner: "IT Ops", location: "Azure GCC High" },
+      { systemId: falcon.id, name: "SIEM / Log Collector", assetType: "Application", category: "SECURITY_PROTECTION", owner: "Security", location: "Enclave VLAN" },
+      { systemId: falcon.id, name: "Managed Firewall", assetType: "Network", category: "SECURITY_PROTECTION", owner: "MSP", location: "Perimeter" },
+      { systemId: falcon.id, name: "Corporate Wiki", assetType: "Application", category: "OUT_OF_SCOPE", owner: "IT Ops", location: "Corporate network" },
+    ],
+  });
+
   // Org policy library
   await prisma.policy.createMany({
     data: [
@@ -343,7 +445,7 @@ async function main() {
       action: "seed.complete",
       entityType: "organization",
       entityId: org.id,
-      metadata: JSON.stringify({ systems: 2, controls: allControls.length }),
+      metadata: JSON.stringify({ systems: 3, controls: allControls.length + controls171Rows.length }),
     },
   });
 

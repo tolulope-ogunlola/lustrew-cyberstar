@@ -4,14 +4,17 @@ import type { IconName } from "@/components/icons";
 // Navigation items in the authenticated shell. Used both for routing and the sidebar.
 export type NavKey =
   | "dashboard"
+  | "copilot"
   | "systems"
   | "controls"
   | "crosswalks"
+  | "cmmc"
   | "evidence"
   | "vulnerabilities"
   | "stig"
   | "poams"
   | "risks"
+  | "authorization"
   | "ppsm"
   | "policies"
   | "reports"
@@ -29,14 +32,17 @@ export const NAV_META: Record<
   { label: string; subtitle: string; href: string; icon: IconName; section: NavSection }
 > = {
   dashboard: { label: "Overview", subtitle: "Posture & readiness", href: "/dashboard", icon: "gauge", section: "COMPLIANCE" },
+  copilot: { label: "AI Copilot", subtitle: "Chat, gaps & doc generation", href: "/copilot", icon: "bolt", section: "COMPLIANCE" },
   systems: { label: "Systems", subtitle: "Authorization boundaries", href: "/systems", icon: "server", section: "COMPLIANCE" },
   controls: { label: "Controls", subtitle: "NIST 800-53 library", href: "/controls", icon: "shield", section: "COMPLIANCE" },
   crosswalks: { label: "Crosswalks", subtitle: "CMMC / ISO / SOC 2 mapping", href: "/crosswalks", icon: "scale", section: "COMPLIANCE" },
+  cmmc: { label: "CMMC", subtitle: "800-171 & SPRS readiness", href: "/cmmc", icon: "medal", section: "COMPLIANCE" },
   evidence: { label: "Evidence", subtitle: "Artifacts & mapping", href: "/evidence", icon: "folder", section: "COMPLIANCE" },
   vulnerabilities: { label: "Vulnerabilities", subtitle: "Scan findings & triage", href: "/vulnerabilities", icon: "alert", section: "COMPLIANCE" },
   stig: { label: "STIG", subtitle: "Checklist compliance", href: "/stig", icon: "check", section: "COMPLIANCE" },
   poams: { label: "POA&Ms", subtitle: "Findings & remediation", href: "/poams", icon: "flag", section: "COMPLIANCE" },
   risks: { label: "Risk Register", subtitle: "Likelihood × impact", href: "/risks", icon: "scale", section: "COMPLIANCE" },
+  authorization: { label: "Authorization", subtitle: "SCA, AO decisions & OSCAL", href: "/authorization", icon: "stamp", section: "COMPLIANCE" },
   ppsm: { label: "PPSM", subtitle: "Ports, protocols, services", href: "/ppsm", icon: "plug", section: "COMPLIANCE" },
   policies: { label: "Policies", subtitle: "Governance & acknowledgements", href: "/policies", icon: "book", section: "COMPLIANCE" },
   reports: { label: "Reports", subtitle: "Export PDF / XLSX / CSV", href: "/reports", icon: "doc", section: "SYSTEM" },
@@ -49,12 +55,12 @@ export const NAV_META: Record<
 // Which nav items each role sees. Executives get a read-only posture view; system owners
 // work on their assigned systems; admins see everything including the audit log.
 export const ROLE_NAV: Record<Role, NavKey[]> = {
-  ADMIN: ["dashboard", "systems", "controls", "crosswalks", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications", "users", "audit"],
-  ATO_SME: ["dashboard", "systems", "controls", "crosswalks", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications"],
-  ISSO: ["dashboard", "systems", "controls", "crosswalks", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications"],
-  VULN_ANALYST: ["dashboard", "systems", "vulnerabilities", "stig", "poams", "reports", "notifications"],
-  SYSTEM_OWNER: ["dashboard", "systems", "evidence", "ppsm", "policies", "notifications"],
-  EXECUTIVE: ["dashboard", "risks", "policies", "reports", "notifications"],
+  ADMIN: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "ppsm", "policies", "reports", "integrations", "notifications", "users", "audit"],
+  ATO_SME: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "ppsm", "policies", "reports", "integrations", "notifications"],
+  ISSO: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "ppsm", "policies", "reports", "integrations", "notifications"],
+  VULN_ANALYST: ["dashboard", "copilot", "systems", "vulnerabilities", "stig", "poams", "reports", "notifications"],
+  SYSTEM_OWNER: ["dashboard", "systems", "evidence", "ppsm", "policies", "authorization", "notifications"],
+  EXECUTIVE: ["dashboard", "risks", "authorization", "policies", "reports", "notifications"],
 };
 
 // Coarse-grained permissions. `action` is "read" or "write"; `entity` is the resource family.
@@ -72,12 +78,14 @@ export type Entity =
   | "policy"
   | "integration"
   | "audit"
-  | "ai";
+  | "ai"
+  | "assessment"
+  | "authorization";
 
 const WRITE_MATRIX: Record<Role, Entity[]> = {
-  ADMIN: ["system", "control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "audit", "ai"],
-  ATO_SME: ["system", "control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "ai"],
-  ISSO: ["control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "ai"],
+  ADMIN: ["system", "control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "audit", "ai", "assessment", "authorization"],
+  ATO_SME: ["system", "control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "ai", "assessment", "authorization"],
+  ISSO: ["control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "ai", "assessment"],
   VULN_ANALYST: ["poam", "vuln", "stig", "ai"],
   SYSTEM_OWNER: ["evidence", "ppsm"],
   EXECUTIVE: [],
@@ -88,8 +96,8 @@ const READ_MATRIX: Record<Role, Entity[] | "all"> = {
   ATO_SME: "all",
   ISSO: "all",
   VULN_ANALYST: ["system", "control", "poam", "vuln", "stig", "ai"],
-  SYSTEM_OWNER: ["system", "control", "evidence", "rmf", "poam", "ppsm", "policy"],
-  EXECUTIVE: ["system", "control", "poam", "rmf", "vuln", "risk", "policy"],
+  SYSTEM_OWNER: ["system", "control", "evidence", "rmf", "poam", "ppsm", "policy", "assessment", "authorization"],
+  EXECUTIVE: ["system", "control", "poam", "rmf", "vuln", "risk", "policy", "assessment", "authorization"],
 };
 
 export function can(role: Role, action: Action, entity: Entity): boolean {

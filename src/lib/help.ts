@@ -45,6 +45,24 @@ export const HELP: Record<string, HelpEntry> = {
       ] },
     ],
   },
+  copilot: {
+    title: "AI Compliance Copilot",
+    intro: "Ask grounded questions, run a gap analysis, and generate draft SSP/SAR documents — all from the selected system's data.",
+    sections: [
+      { heading: "Chat", items: [
+        "Answers are grounded only in the chosen system's controls, POA&Ms, vulnerabilities, and risks.",
+        "Source chips show which controls/POA&Ms informed the answer.",
+      ] },
+      { heading: "Gap Analysis", items: [
+        "Detects unimplemented controls, missing evidence/narratives, overdue POA&Ms, and open findings/risks.",
+        "Returns a prioritized path to ATO; gaps are computed deterministically, then narrated by AI.",
+      ] },
+      { heading: "Documents", items: [
+        "Generate a draft System Security Plan or Security Assessment Report and download it as Markdown.",
+        "Everything is a draft for human review — never a final authorization decision.",
+      ] },
+    ],
+  },
   systems: {
     title: "Systems",
     intro: "Each system is an authorization boundary. Open one to work its full compliance lifecycle.",
@@ -74,6 +92,24 @@ export const HELP: Record<string, HelpEntry> = {
         "Search by family code (e.g. AC) or by a target reference to find equivalents.",
         "Use the mappings to scope reciprocity and reuse evidence across frameworks.",
         "Mappings are family-level aids — confirm individual control applicability before relying on them.",
+      ] },
+    ],
+  },
+  cmmc: {
+    title: "CMMC Readiness",
+    intro: "Track NIST SP 800-171 implementation, your SPRS score, and CUI asset scoping for a CMMC assessment.",
+    sections: [
+      { heading: "Getting started", items: [
+        "Create a system with the CMMC Level 1/2 or NIST 800-171 framework — the 110 requirements (or the 17 L1 practices) generate automatically.",
+        "Work each requirement on the system's Controls tab; status IMPLEMENTED counts as met.",
+      ] },
+      { heading: "What you see", items: [
+        "SPRS score (DoD Assessment Methodology estimate, floor −203) and percent implemented.",
+        "Coverage by 800-171 family with the related 800-53 family for evidence reuse.",
+        "A prioritized gap list — highest SPRS point-impact first — showing what blocks your assessment.",
+      ] },
+      { heading: "Asset inventory", items: [
+        "Categorize assets (CUI / Security Protection / Contractor Risk Managed / Specialized / Out of Scope) to define your assessment boundary.",
       ] },
     ],
   },
@@ -127,6 +163,25 @@ export const HELP: Record<string, HelpEntry> = {
       { heading: "Actions", items: [
         "Capture inherent and residual likelihood/impact; the rating is computed for you.",
         "Use the heatmap to see concentration; formally accept a risk with an approval authority.",
+      ] },
+    ],
+  },
+  authorization: {
+    title: "Assessment & Authorization",
+    intro: "Run a Security Control Assessment (SCA), record the Authorizing Official's decision, and export OSCAL.",
+    sections: [
+      { heading: "Assessments (SCA)", items: [
+        "Starting an assessment seeds a result row per applicable control, prefilled from its current status.",
+        "Set each control to Satisfied / Other than satisfied / Not applicable and capture findings + recommendations.",
+        "Mark the assessment complete once every applicable control is assessed; it then feeds the AI-generated SAR.",
+      ] },
+      { heading: "Authorization decisions", items: [
+        "Record an ATO / ATO-with-conditions / IATT / Denied / Revoked decision with the AO, dates, rationale, and conditions.",
+        "Decisions are immutable history and written to the audit log.",
+      ] },
+      { heading: "OSCAL export", items: [
+        "Download OSCAL 1.1.2 SSP and assessment-results JSON for eMASS/RegScale and other OSCAL tools.",
+        "Inherited/hybrid controls carry their common control provider as control-origination.",
       ] },
     ],
   },

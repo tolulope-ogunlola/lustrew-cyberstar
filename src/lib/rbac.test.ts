@@ -38,7 +38,7 @@ describe("ROLE_NAV", () => {
   });
 
   it("limits EXECUTIVE to read-only dashboard, risk register, and reports", () => {
-    expect(ROLE_NAV.EXECUTIVE).toEqual(["dashboard", "risks", "policies", "reports", "notifications"]);
+    expect(ROLE_NAV.EXECUTIVE).toEqual(["dashboard", "risks", "authorization", "policies", "reports", "notifications"]);
     expect(can("EXECUTIVE", "read", "risk")).toBe(true);
     expect(can("EXECUTIVE", "write", "risk")).toBe(false);
   });

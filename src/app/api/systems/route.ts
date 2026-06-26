@@ -3,6 +3,7 @@ import { requireUser, requirePermission, route } from "@/lib/api";
 import { writeAuditEvent } from "@/lib/audit";
 import { systemCreateSchema } from "@/lib/validation";
 import { serializeFrameworks, withFrameworks } from "@/lib/util";
+import { requirementsForLevel } from "@/lib/cmmc";
 
 export async function GET() {
   return route(async () => {
@@ -35,11 +36,26 @@ export async function POST(req: Request) {
       },
     });
 
-    // Spin up an implementation row per catalog control, plus the seven RMF steps.
-    const controls = await prisma.control.findMany({ select: { id: true } });
-    if (controls.length) {
+    // Spin up an implementation row per applicable catalog control (scoped to the system's
+    // frameworks), plus the seven RMF steps. A system can carry 800-53 and/or 800-171 controls.
+    const fw = body.frameworks;
+    const wants171 = fw.some((f) => f === "CMMC_L1" || f === "CMMC_L2" || f === "NIST_800_171");
+    const wants53 = fw.some((f) => !["CMMC_L1", "CMMC_L2", "NIST_800_171"].includes(f)) || !wants171;
+    const l1Only = wants171 && fw.includes("CMMC_L1") && !fw.includes("CMMC_L2") && !fw.includes("NIST_800_171");
+
+    const controlIds: string[] = [];
+    if (wants53) {
+      const c53 = await prisma.control.findMany({ where: { framework: "NIST_800_53" }, select: { id: true } });
+      controlIds.push(...c53.map((c) => c.id));
+    }
+    if (wants171) {
+      const c171 = await prisma.control.findMany({ where: { framework: "NIST_800_171" }, orderBy: { controlId: "asc" }, select: { id: true, controlId: true } });
+      const keep = l1Only ? new Set(requirementsForLevel("CMMC_L1", c171.map((c) => c.controlId))) : null;
+      controlIds.push(...c171.filter((c) => (keep ? keep.has(c.controlId) : true)).map((c) => c.id));
+    }
+    if (controlIds.length) {
       await prisma.controlImplementation.createMany({
-        data: controls.map((c) => ({ systemId: system.id, controlId: c.id })),
+        data: controlIds.map((id) => ({ systemId: system.id, controlId: id })),
       });
     }
     const steps = [
@@ -60,7 +76,7 @@ export async function POST(req: Request) {
       action: "system.create",
       entityType: "system",
       entityId: system.id,
-      metadata: { name: system.name, controls: controls.length },
+      metadata: { name: system.name, controls: controlIds.length },
     });
 
     return withFrameworks(system);

@@ -9,6 +9,7 @@ type Impl = {
   status: string;
   scoping: string;
   narrative: string;
+  providerName: string;
   owner: { name: string } | null;
   _count: { evidenceLinks: number };
   control: { controlId: string; family: string; title: string; text: string };
@@ -97,13 +98,16 @@ function ControlRow({
   const [narrative, setNarrative] = useState(impl.narrative);
   const [status, setStatus] = useState(impl.status);
   const [scoping, setScoping] = useState(impl.scoping);
+  const [providerName, setProviderName] = useState(impl.providerName ?? "");
   const [showAi, setShowAi] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const isInherited = scoping === "INHERITED" || scoping === "HYBRID";
 
   async function save() {
     setSaving(true);
     try {
-      await apiSend(`/api/controls/${impl.id}`, "PATCH", { status, scoping, narrative });
+      await apiSend(`/api/controls/${impl.id}`, "PATCH", { status, scoping, narrative, providerName: isInherited ? providerName : "" });
       onSaved();
     } finally {
       setSaving(false);
@@ -149,6 +153,18 @@ function ControlRow({
                   ))}
                 </select>
               </div>
+              {isInherited && (
+                <div className="md:col-span-2">
+                  <label className="label">Common control provider</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. AWS GovCloud, Agency Shared Services"
+                    value={providerName}
+                    onChange={(e) => setProviderName(e.target.value)}
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Who provides this inherited/hybrid control. Recorded in the SSP and OSCAL export as control origination.</p>
+                </div>
+              )}
             </div>
             <div className="mt-3">
               <div className="flex items-center justify-between">

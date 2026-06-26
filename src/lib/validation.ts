@@ -41,6 +41,9 @@ export const FRAMEWORKS = [
   "NIST_RMF",
   "NIST_800_53",
   "NIST_800_37",
+  "NIST_800_171",
+  "CMMC_L1",
+  "CMMC_L2",
   "FISMA",
   "FEDRAMP_READY",
   "SOC2",
@@ -71,6 +74,7 @@ export const implementationUpdateSchema = z.object({
     ])
     .optional(),
   narrative: z.string().max(20000).optional(),
+  providerName: z.string().max(200).optional(),
   ownerId: z.string().nullable().optional(),
 });
 
@@ -203,4 +207,66 @@ export const aiDraftSchema = z.object({
   systemId: z.string(),
   implementationId: z.string().optional(),
   poamId: z.string().optional(),
+});
+
+// --- Assessment & Authorization ---
+export const ASSESSMENT_RESULTS = ["SATISFIED", "OTHER_THAN_SATISFIED", "NOT_APPLICABLE", "NOT_ASSESSED"] as const;
+export const AUTHORIZATION_DECISIONS = ["ATO", "ATO_WITH_CONDITIONS", "IATT", "DENIED", "REVOKED"] as const;
+
+export const assessmentCreateSchema = z.object({
+  systemId: z.string(),
+  title: z.string().min(2).max(200),
+  assessorName: z.string().max(200).optional(),
+});
+
+export const assessmentUpdateSchema = z.object({
+  status: z.enum(["DRAFT", "IN_PROGRESS", "COMPLETED"]).optional(),
+  summary: z.string().max(8000).optional(),
+  assessorName: z.string().max(200).optional(),
+});
+
+export const assessmentResultUpdateSchema = z.object({
+  result: z.enum(ASSESSMENT_RESULTS).optional(),
+  findings: z.string().max(8000).optional(),
+  recommendation: z.string().max(8000).optional(),
+});
+
+// --- CMMC / 800-171 asset inventory ---
+export const ASSET_CATEGORIES = ["CUI", "SECURITY_PROTECTION", "CONTRACTOR_RISK_MANAGED", "SPECIALIZED", "OUT_OF_SCOPE"] as const;
+export const ASSET_TYPES = ["Server", "Workstation", "Network", "Cloud Service", "Application", "Mobile", "Other"] as const;
+
+export const assetCreateSchema = z.object({
+  systemId: z.string(),
+  name: z.string().min(1).max(200),
+  assetType: z.enum(ASSET_TYPES).optional(),
+  category: z.enum(ASSET_CATEGORIES).optional(),
+  description: z.string().max(2000).optional(),
+  owner: z.string().max(200).optional(),
+  location: z.string().max(200).optional(),
+});
+
+export const authorizationCreateSchema = z.object({
+  systemId: z.string(),
+  decision: z.enum(AUTHORIZATION_DECISIONS),
+  authorizingOfficial: z.string().min(2).max(200),
+  decisionDate: z.string().optional(), // ISO date; defaults to now
+  expiresAt: z.string().optional(),
+  rationale: z.string().max(8000).optional(),
+  conditions: z.string().max(8000).optional(),
+});
+
+export const aiChatSchema = z.object({
+  systemId: z.string(),
+  question: z.string().min(1).max(2000),
+  history: z
+    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(8000) }))
+    .max(20)
+    .optional(),
+});
+
+export const aiGapSchema = z.object({ systemId: z.string() });
+
+export const aiDocSchema = z.object({
+  systemId: z.string(),
+  kind: z.enum(["ssp", "sar"]),
 });
