@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCsv, parseNessus, parseScan } from "./parse";
+import { parseCsv, parseNessus, parseScan, detectCsvSource } from "./parse";
 
 describe("parseCsv", () => {
   it("maps Nessus-style CSV columns and handles quoted commas", () => {
@@ -20,6 +20,48 @@ describe("parseCsv", () => {
 
   it("throws when no title-like column exists", () => {
     expect(() => parseCsv("foo,bar\n1,2")).toThrow();
+  });
+
+  it("maps Qualys columns (QID, Title, Severity, CVSS Base, IP, CVE ID)", () => {
+    const csv = [`QID,Title,Severity,CVSS Base,IP,CVE ID,Solution`, `38170,SSL Certificate expired,4,7.4,10.1.1.9,CVE-2023-0001,Renew certificate`].join("\n");
+    const out = parseCsv(csv);
+    expect(out[0].pluginId).toBe("38170");
+    expect(out[0].title).toBe("SSL Certificate expired");
+    expect(out[0].cvss).toBe(7.4);
+    expect(out[0].host).toBe("10.1.1.9");
+    expect(out[0].cve).toBe("CVE-2023-0001");
+  });
+
+  it("maps OpenVAS columns (NVT Name, CVEs, Severity, Hostname)", () => {
+    const csv = [`IP,Hostname,Port,CVEs,NVT Name,Severity,Summary`, `10.2.2.2,web01,443/tcp,CVE-2022-2222,TLS weak ciphers,6.5,Weak ciphers detected`].join("\n");
+    const out = parseCsv(csv);
+    expect(out[0].title).toBe("TLS weak ciphers");
+    expect(out[0].host).toBe("10.2.2.2");
+    expect(out[0].cve).toBe("CVE-2022-2222");
+    expect(out[0].severity).toBe("6.5");
+  });
+
+  it("maps Microsoft Defender columns (CveId, Vulnerability Name, Device Name)", () => {
+    const csv = [`CveId,Vulnerability Name,Severity,Cvss,Device Name,Recommendation`, `CVE-2024-9999,Outdated Chrome,High,8.8,LAPTOP-01,Update Chrome`].join("\n");
+    const out = parseCsv(csv);
+    expect(out[0].title).toBe("Outdated Chrome");
+    expect(out[0].cve).toBe("CVE-2024-9999");
+    expect(out[0].host).toBe("LAPTOP-01");
+    expect(out[0].solution).toBe("Update Chrome");
+  });
+});
+
+describe("detectCsvSource", () => {
+  it("identifies each scanner from signature columns", () => {
+    expect(detectCsvSource(["QID", "Title", "Severity"])).toBe("Qualys");
+    expect(detectCsvSource(["IP", "NVT Name", "CVEs"])).toBe("OpenVAS");
+    expect(detectCsvSource(["CveId", "Device Name", "Severity"])).toBe("Defender");
+    expect(detectCsvSource(["Vulnerability ID", "Vulnerability Title"])).toBe("Rapid7");
+    expect(detectCsvSource(["Plugin ID", "Name", "Host"])).toBe("CSV");
+  });
+
+  it("parseScan labels a Qualys CSV as Qualys", () => {
+    expect(parseScan("export.csv", "QID,Title,IP\n1,Test,10.0.0.1").source).toBe("Qualys");
   });
 });
 

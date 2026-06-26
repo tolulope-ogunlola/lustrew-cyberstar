@@ -5,7 +5,7 @@ import { PageHeader, apiSend, useApi } from "@/components/ui";
 import { Icon } from "@/components/icons";
 
 type SystemRow = { id: string; name: string; fipsCategory: string };
-type Tab = "chat" | "gaps" | "documents";
+type Tab = "chat" | "gaps" | "documents" | "policy";
 
 export default function CopilotPage() {
   const { data: systems } = useApi<SystemRow[]>("/api/systems");
@@ -36,6 +36,7 @@ export default function CopilotPage() {
           ["chat", "Chat"],
           ["gaps", "Gap Analysis"],
           ["documents", "Documents"],
+          ["policy", "Policy Analyzer"],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
@@ -57,6 +58,77 @@ export default function CopilotPage() {
       {systemId && tab === "chat" && <ChatTab systemId={systemId} />}
       {systemId && tab === "gaps" && <GapsTab systemId={systemId} />}
       {systemId && tab === "documents" && <DocsTab systemId={systemId} />}
+      {systemId && tab === "policy" && <PolicyTab systemId={systemId} />}
+    </div>
+  );
+}
+
+// --- Policy Analyzer -------------------------------------------------------
+function PolicyTab({ systemId }: { systemId: string }) {
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<{ text: string; source: string; notice?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setText("");
+    setResult(null);
+    setError("");
+  }, [systemId]);
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setText(String(reader.result ?? ""));
+    reader.readAsText(file);
+  }
+
+  async function analyze() {
+    if (text.trim().length < 20) {
+      setError("Paste at least a paragraph of policy text.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      setResult(await apiSend("/api/ai/policy-analysis", "POST", { systemId, text }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-400">
+        Paste a policy or procedure (or load a .txt/.md file). The Copilot maps it to this system&apos;s controls and flags coverage gaps,
+        vague language, and the evidence an assessor will still want. PDF/Word: paste the text for now.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={onFile} className="text-xs text-slate-400" />
+        <span className="text-xs text-slate-500">{text.length} characters</span>
+      </div>
+      <textarea
+        className="input h-48 w-full text-sm"
+        placeholder="Paste policy text here…"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <div className="flex items-center gap-3">
+        <button className="btn-primary" onClick={analyze} disabled={loading}>
+          {loading ? "Analyzing…" : "Analyze against controls"}
+        </button>
+        {error && <span className="text-sm text-red-600 dark:text-red-400">{error}</span>}
+      </div>
+
+      {result && (
+        <>
+          {result.notice && <p className="text-xs text-amber-700 dark:text-amber-300">{result.notice}</p>}
+          <div className="card whitespace-pre-wrap text-sm text-slate-200">{result.text}</div>
+        </>
+      )}
     </div>
   );
 }

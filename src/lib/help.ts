@@ -61,6 +61,10 @@ export const HELP: Record<string, HelpEntry> = {
         "Generate a draft System Security Plan or Security Assessment Report and download it as Markdown.",
         "Everything is a draft for human review — never a final authorization decision.",
       ] },
+      { heading: "Policy Analyzer", items: [
+        "Paste a policy/procedure (or load a .txt/.md file) to map it against this system's controls.",
+        "Surfaces covered/partial/uncovered controls, vague language to tighten, and evidence still needed.",
+      ] },
     ],
   },
   systems: {

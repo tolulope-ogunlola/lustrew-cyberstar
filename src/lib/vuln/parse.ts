@@ -12,8 +12,10 @@ export type ParsedVuln = {
   port?: string;
 };
 
+export type ScanSource = "Nessus" | "Qualys" | "Rapid7" | "Defender" | "OpenVAS" | "CSV";
+
 export type ParseResult = {
-  source: "Nessus" | "CSV";
+  source: ScanSource;
   findings: ParsedVuln[];
 };
 
@@ -58,17 +60,30 @@ function parseCsvRows(text: string): string[][] {
   return rows.filter((r) => r.some((v) => v.trim() !== ""));
 }
 
+// Column aliases spanning common scanner CSV exports: Nessus/Tenable, Qualys, Rapid7
+// (Nexpose/InsightVM), Microsoft Defender, and OpenVAS/Greenbone. The mapper matches by header
+// name, so a single generic parser handles every supported scanner without per-tool code paths.
 const ALIASES: Record<keyof ParsedVuln, string[]> = {
-  pluginId: ["plugin id", "pluginid", "plugin", "plugin_id"],
-  cve: ["cve", "cve id", "cves"],
-  title: ["name", "plugin name", "title", "vulnerability", "finding"],
-  description: ["description", "synopsis", "summary"],
-  solution: ["solution", "remediation", "steps to remediate", "fix"],
-  severity: ["severity", "risk", "risk factor", "criticality"],
-  cvss: ["cvss v3.0 base score", "cvss3 base score", "cvssv3", "cvss base score", "cvss", "cvss2 base score"],
-  host: ["host", "ip", "ip address", "asset", "dns name", "host ip"],
-  port: ["port"],
+  pluginId: ["plugin id", "pluginid", "plugin", "plugin_id", "qid", "vulnerability id", "vuln id", "nvt oid", "oid"],
+  cve: ["cve", "cve id", "cves", "cve_id", "cveid"],
+  title: ["name", "plugin name", "title", "vulnerability", "finding", "vulnerability title", "vulnerability name", "nvt name", "threat"],
+  description: ["description", "synopsis", "summary", "impact", "details"],
+  solution: ["solution", "remediation", "steps to remediate", "fix", "recommendation"],
+  severity: ["severity", "risk", "risk factor", "criticality", "severity level", "risk level", "threat level"],
+  cvss: ["cvss v3.0 base score", "cvss3 base score", "cvssv3", "cvss base score", "cvss", "cvss2 base score", "cvss base", "cvss score", "cvss v3 base score", "cvss3 base", "cvssv3.1 base score"],
+  host: ["host", "ip", "ip address", "asset", "dns name", "host ip", "dns", "hostname", "device name", "computer name", "netbios", "asset ip address", "asset name"],
+  port: ["port", "port number", "service port"],
 };
+
+// Identify the originating scanner from signature columns, for a friendlier import label.
+export function detectCsvSource(header: string[]): ScanSource {
+  const h = new Set(header.map((c) => c.trim().toLowerCase()));
+  if (h.has("qid")) return "Qualys";
+  if (h.has("nvt name") || h.has("nvt oid")) return "OpenVAS";
+  if (h.has("device name") || h.has("cveid") || h.has("computer name")) return "Defender";
+  if (h.has("vulnerability id") || h.has("vuln id") || h.has("vulnerability title")) return "Rapid7";
+  return "CSV";
+}
 
 function buildColumnMap(header: string[]): Partial<Record<keyof ParsedVuln, number>> {
   const lower = header.map((h) => h.trim().toLowerCase());
@@ -165,5 +180,7 @@ export function parseScan(fileName: string, content: string): ParseResult {
   if (looksXml) {
     return { source: "Nessus", findings: parseNessus(content) };
   }
-  return { source: "CSV", findings: parseCsv(content) };
+  const rows = parseCsvRows(content);
+  const source = rows.length ? detectCsvSource(rows[0]) : "CSV";
+  return { source, findings: parseCsv(content) };
 }
