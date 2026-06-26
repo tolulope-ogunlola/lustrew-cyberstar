@@ -55,6 +55,6 @@ export async function POST(req: Request) {
       metadata: { fileName: file.name, source: parsed.source, total: result.total, created: result.created, updated: result.updated },
     });
 
-    return result;
+    return { ...result, source: parsed.source };
   });
 }

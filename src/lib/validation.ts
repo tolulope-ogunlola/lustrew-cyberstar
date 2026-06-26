@@ -270,3 +270,8 @@ export const aiDocSchema = z.object({
   systemId: z.string(),
   kind: z.enum(["ssp", "sar"]),
 });
+
+export const aiPolicyAnalysisSchema = z.object({
+  systemId: z.string(),
+  text: z.string().min(20, "Paste at least a paragraph of policy text").max(50000),
+});
