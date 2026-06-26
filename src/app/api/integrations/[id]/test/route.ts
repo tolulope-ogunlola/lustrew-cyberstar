@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { HttpError, requirePermission, route } from "@/lib/api";
 import { SCANNERS } from "@/lib/integrations/scanners";
+import { REPOSITORIES } from "@/lib/integrations/sharepoint";
 import { decryptConfig } from "@/lib/integrations/mask";
 
 // Test connectivity for a connector (scanners + ServiceNow honor mock mode).
@@ -14,6 +15,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
     const scanner = SCANNERS[row.type];
     if (scanner) return scanner.testConnection(config);
+
+    const repository = REPOSITORIES[row.type];
+    if (repository) return repository.testConnection(config);
 
     if (row.type === "SERVICENOW") {
       if (config.mock) return { ok: true, message: "Mock mode — no live call made." };

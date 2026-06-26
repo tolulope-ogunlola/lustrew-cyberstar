@@ -417,6 +417,14 @@ async function main() {
     },
   });
 
+  // Demo connectors (mock mode) targeting Atlas — click Sync to pull data into the platform.
+  await prisma.integration.createMany({
+    data: [
+      { orgId: org.id, type: "TENABLE", name: "Tenable.io (demo)", systemId: atlas.id, config: JSON.stringify({ mock: true }) },
+      { orgId: org.id, type: "SHAREPOINT", name: "SharePoint — ATO Library (demo)", systemId: atlas.id, config: JSON.stringify({ mock: true }) },
+    ],
+  });
+
   // --- CMMC Level 2 contractor enclave (NIST 800-171) ---
   const falcon = await prisma.system.create({
     data: {
