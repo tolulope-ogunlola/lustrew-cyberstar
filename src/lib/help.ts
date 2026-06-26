@@ -238,9 +238,10 @@ export const HELP: Record<string, HelpEntry> = {
     intro: "Connect scanners, ITSM, and GRC platforms. Connectors support a mock mode for trial without credentials.",
     sections: [
       { heading: "Actions", items: [
-        "Connect Tenable/Qualys and Sync to pull findings into the vulnerability pipeline.",
+        "Connect Tenable and Sync to pull live findings (Vulns Export API) into the vulnerability pipeline.",
+        "Connect SharePoint (Microsoft Graph) and Sync to import library documents into the evidence vault.",
         "Push a POA&M to ServiceNow, or export POA&Ms in eMASS CSV layout.",
-        "Secrets are never displayed back after saving.",
+        "Every connector has a mock mode to trial the flow without credentials; secrets are encrypted and never displayed back.",
       ] },
     ],
   },

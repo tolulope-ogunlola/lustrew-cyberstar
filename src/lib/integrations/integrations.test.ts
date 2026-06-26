@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildEmassCsv } from "./emass";
-import { SCANNERS } from "./scanners";
+import { SCANNERS, mapTenableExportRow } from "./scanners";
+import { REPOSITORIES, mapGraphItems } from "./sharepoint";
 import { pushPoamToServiceNow } from "./servicenow";
 import { CONNECTORS } from "./registry";
 
@@ -43,6 +44,44 @@ describe("scanner connectors (mock)", () => {
 
   it("scanner test fails without credentials in live mode", async () => {
     expect((await SCANNERS.TENABLE.testConnection({ mock: false })).ok).toBe(false);
+  });
+
+  it("maps a Tenable vulns-export row to a ParsedVuln with host/port/cve/cvss", () => {
+    const v = mapTenableExportRow({
+      severity_id: 4,
+      plugin: { id: 19506, name: "Apache RCE", cve: ["CVE-2023-1234"], cvss3_base_score: 9.8, solution: "Upgrade" },
+      asset: { hostname: "web01", ipv4: "10.0.2.10" },
+      port: { port: 443 },
+    });
+    expect(v.pluginId).toBe("19506");
+    expect(v.cve).toBe("CVE-2023-1234");
+    expect(v.severity).toBe("Critical");
+    expect(v.cvss).toBe(9.8);
+    expect(v.host).toBe("web01");
+    expect(v.port).toBe("443");
+  });
+});
+
+describe("SharePoint repository connector", () => {
+  it("mock returns sample documents and tests ok", async () => {
+    expect((await REPOSITORIES.SHAREPOINT.testConnection({ mock: true })).ok).toBe(true);
+    const docs = await REPOSITORIES.SHAREPOINT.fetchDocuments({ mock: true });
+    expect(docs.length).toBeGreaterThan(0);
+    expect(docs[0].url).toMatch(/^https:\/\//);
+  });
+
+  it("maps Graph driveItems to docs and skips folders", () => {
+    const docs = mapGraphItems([
+      { name: "Policy.pdf", webUrl: "https://x/Policy.pdf", size: 100, file: { mimeType: "application/pdf" } },
+      { name: "A folder", webUrl: "https://x/folder", folder: { childCount: 2 } },
+    ]);
+    expect(docs).toHaveLength(1);
+    expect(docs[0].name).toBe("Policy.pdf");
+    expect(docs[0].contentType).toBe("application/pdf");
+  });
+
+  it("test fails without credentials in live mode", async () => {
+    expect((await REPOSITORIES.SHAREPOINT.testConnection({ mock: false })).ok).toBe(false);
   });
 });
 

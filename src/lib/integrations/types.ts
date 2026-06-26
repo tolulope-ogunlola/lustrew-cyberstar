@@ -25,6 +25,12 @@ export type IntegrationConfig = {
   baseUrl?: string;
   accessKey?: string;
   secretKey?: string;
+  // Microsoft Graph / SharePoint (Azure AD app, client-credentials)
+  tenantId?: string;
+  clientId?: string;
+  clientSecret?: string;
+  siteId?: string;
+  folderPath?: string;
   [k: string]: unknown;
 };
 
@@ -34,4 +40,19 @@ export type TestResult = { ok: boolean; message: string };
 export interface ScannerConnector {
   testConnection(config: IntegrationConfig): Promise<TestResult>;
   fetchFindings(config: IntegrationConfig): Promise<ParsedVuln[]>;
+}
+
+/** A document pulled from a content repository (e.g. SharePoint) to register as evidence. */
+export type RepoDoc = {
+  name: string;
+  url: string; // canonical link (Graph webUrl)
+  contentType?: string;
+  size?: number;
+  modifiedAt?: string;
+};
+
+/** Repository connectors pull evidence documents to register in the evidence vault. */
+export interface RepositoryConnector {
+  testConnection(config: IntegrationConfig): Promise<TestResult>;
+  fetchDocuments(config: IntegrationConfig): Promise<RepoDoc[]>;
 }

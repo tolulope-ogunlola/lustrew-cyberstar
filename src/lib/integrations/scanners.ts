@@ -13,34 +13,86 @@ const QUALYS_SAMPLE: ParsedVuln[] = [
   { pluginId: "QID-38170", title: "TLS 1.0 enabled", severity: "Medium", cvss: 5.0, host: "10.0.2.20", port: "443", solution: "Disable TLS 1.0" },
 ];
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const base = (c: IntegrationConfig) => (c.baseUrl || "https://cloud.tenable.com").replace(/\/$/, "");
 function authHeaderTenable(c: IntegrationConfig): Record<string, string> {
-  return { "X-ApiKeys": `accessKey=${c.accessKey ?? ""}; secretKey=${c.secretKey ?? ""}`, Accept: "application/json" };
+  return { "X-ApiKeys": `accessKey=${c.accessKey ?? ""}; secretKey=${c.secretKey ?? ""}`, Accept: "application/json", "Content-Type": "application/json" };
 }
 
-// Tenable.io — mock returns sample data; live mode performs a best-effort export read.
+// Tenable numeric severity (0..4) → label used by the prioritizer.
+const TENABLE_SEVERITY = ["Info", "Low", "Medium", "High", "Critical"];
+
+// Map one Tenable vulns-export instance to a ParsedVuln. Pure — unit tested.
+export function mapTenableExportRow(v: Record<string, unknown>): ParsedVuln {
+  const plugin = (v.plugin ?? {}) as Record<string, unknown>;
+  const asset = (v.asset ?? {}) as Record<string, unknown>;
+  const portObj = (v.port ?? {}) as Record<string, unknown>;
+  const cves = Array.isArray(plugin.cve) ? (plugin.cve as string[]) : [];
+  const sevNum = typeof v.severity_id === "number" ? v.severity_id : typeof v.severity === "number" ? v.severity : undefined;
+  const severity = typeof v.severity === "string" ? v.severity : sevNum != null ? TENABLE_SEVERITY[sevNum] ?? "Info" : undefined;
+  const cvss = typeof plugin.cvss3_base_score === "number" ? plugin.cvss3_base_score : typeof plugin.cvss_base_score === "number" ? plugin.cvss_base_score : undefined;
+  return {
+    pluginId: plugin.id != null ? String(plugin.id) : undefined,
+    cve: cves[0],
+    title: String(plugin.name ?? "Tenable finding"),
+    description: typeof plugin.description === "string" ? plugin.description : undefined,
+    solution: typeof plugin.solution === "string" ? plugin.solution : undefined,
+    severity,
+    cvss,
+    host: String(asset.hostname ?? asset.ipv4 ?? asset.fqdn ?? "") || undefined,
+    port: portObj.port != null ? String(portObj.port) : undefined,
+  };
+}
+
+// Tenable.io — mock returns sample data; live mode runs the Vulns Export API
+// (request export → poll status → download chunks). https://developer.tenable.com/reference/exports-vulns-request-export
 const tenable: ScannerConnector = {
   async testConnection(c) {
     if (c.mock) return { ok: true, message: "Mock mode — no live call made." };
-    if (!c.baseUrl || !c.accessKey || !c.secretKey) return { ok: false, message: "baseUrl, accessKey, and secretKey are required." };
+    if (!c.accessKey || !c.secretKey) return { ok: false, message: "accessKey and secretKey are required." };
     try {
-      const res = await fetch(`${c.baseUrl.replace(/\/$/, "")}/server/properties`, { headers: authHeaderTenable(c) });
-      return res.ok ? { ok: true, message: "Connected to Tenable." } : { ok: false, message: `Tenable returned ${res.status}` };
+      const res = await fetch(`${base(c)}/server/properties`, { headers: authHeaderTenable(c) });
+      return res.ok ? { ok: true, message: "Connected to Tenable.io." } : { ok: false, message: `Tenable returned ${res.status}` };
     } catch (e) {
       return { ok: false, message: e instanceof Error ? e.message : "Connection failed" };
     }
   },
   async fetchFindings(c) {
     if (c.mock) return TENABLE_SAMPLE;
-    // Live: read the latest vulnerabilities export. Mapping kept minimal; mock path is the tested one.
-    const res = await fetch(`${c.baseUrl!.replace(/\/$/, "")}/workbenches/vulnerabilities`, { headers: authHeaderTenable(c) });
-    if (!res.ok) throw new Error(`Tenable returned ${res.status}`);
-    const data = (await res.json()) as { vulnerabilities?: Array<Record<string, unknown>> };
-    return (data.vulnerabilities ?? []).map((v) => ({
-      pluginId: String(v.plugin_id ?? ""),
-      title: String(v.plugin_name ?? "Finding"),
-      severity: String(v.severity ?? "info"),
-      cvss: typeof v.cvss_base_score === "number" ? v.cvss_base_score : undefined,
-    }));
+    if (!c.accessKey || !c.secretKey) throw new Error("Tenable accessKey and secretKey are required.");
+    const headers = authHeaderTenable(c);
+
+    // 1) Request an export of open/reopened vulnerabilities.
+    const reqRes = await fetch(`${base(c)}/vulns/export`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ num_assets: 50, filters: { state: ["OPEN", "REOPENED"] } }),
+    });
+    if (!reqRes.ok) throw new Error(`Tenable export request failed (${reqRes.status})`);
+    const { export_uuid } = (await reqRes.json()) as { export_uuid: string };
+    if (!export_uuid) throw new Error("Tenable did not return an export_uuid");
+
+    // 2) Poll status until chunks are available (bounded: ~20 polls × 3s ≈ 60s).
+    let chunks: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const stRes = await fetch(`${base(c)}/vulns/export/${export_uuid}/status`, { headers });
+      if (!stRes.ok) throw new Error(`Tenable export status failed (${stRes.status})`);
+      const st = (await stRes.json()) as { status: string; chunks_available?: number[] };
+      chunks = st.chunks_available ?? [];
+      if (st.status === "ERROR") throw new Error("Tenable export errored");
+      if (st.status === "FINISHED" || chunks.length) break;
+      await sleep(3000);
+    }
+
+    // 3) Download up to the first 10 chunks and map each instance.
+    const out: ParsedVuln[] = [];
+    for (const n of chunks.slice(0, 10)) {
+      const chRes = await fetch(`${base(c)}/vulns/export/${export_uuid}/chunks/${n}`, { headers });
+      if (!chRes.ok) continue;
+      const rows = (await chRes.json()) as Array<Record<string, unknown>>;
+      for (const r of rows) out.push(mapTenableExportRow(r));
+    }
+    return out;
   },
 };
 
@@ -60,7 +112,7 @@ const qualys: ScannerConnector = {
   },
   async fetchFindings(c) {
     if (c.mock) return QUALYS_SAMPLE;
-    throw new Error("Live Qualys pull is not enabled in this build — use mock mode or file import.");
+    throw new Error("Live Qualys pull is not enabled in this build — use mock mode or CSV import.");
   },
 };
 

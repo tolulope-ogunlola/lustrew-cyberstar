@@ -2,7 +2,7 @@ import { decryptString, encryptString, isEncrypted } from "@/lib/crypto";
 import type { IntegrationConfig } from "./types";
 
 // Connector config secret fields — encrypted at rest, masked on read, decrypted only for use.
-const SECRET_KEYS = new Set(["accessKey", "secretKey", "password", "token"]);
+const SECRET_KEYS = new Set(["accessKey", "secretKey", "password", "token", "clientSecret"]);
 
 function asObject(json: string): Record<string, unknown> {
   try {
