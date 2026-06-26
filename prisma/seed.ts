@@ -79,7 +79,7 @@ async function main() {
     users[u.role] = created.id;
   }
 
-  // --- Control catalog ---
+  // --- Control catalogs (NIST 800-53 + NIST 800-171) ---
   const controls: ControlSeed[] = JSON.parse(
     readFileSync(join(__dirname, "data", "nist-800-53-controls.json"), "utf8")
   );
@@ -90,9 +90,24 @@ async function main() {
       title: c.title,
       text: c.text,
       baseline: c.baseline,
+      framework: "NIST_800_53",
     })),
   });
-  const allControls = await prisma.control.findMany();
+  const controls171: { controlId: string; family: string; title: string; text: string }[] = JSON.parse(
+    readFileSync(join(__dirname, "data", "nist-800-171.json"), "utf8")
+  );
+  await prisma.control.createMany({
+    data: controls171.map((c) => ({
+      controlId: c.controlId,
+      family: c.family,
+      title: c.title,
+      text: c.text,
+      baseline: "MODERATE",
+      framework: "NIST_800_171",
+    })),
+  });
+  // 800-53 controls drive the RMF/53 demo systems below.
+  const allControls = await prisma.control.findMany({ where: { framework: "NIST_800_53" } });
 
   // --- Two systems with differing maturity ---
   const statuses = [
@@ -342,6 +357,41 @@ async function main() {
     },
   });
 
+  // --- CMMC Level 2 contractor enclave (NIST 800-171) ---
+  const falcon = await prisma.system.create({
+    data: {
+      name: "Falcon Contractor Enclave",
+      description: "CUI enclave for a DoD subcontractor pursuing CMMC Level 2.",
+      fipsCategory: "MODERATE",
+      frameworks: JSON.stringify(["CMMC_L2", "NIST_800_171"]),
+      orgId: org.id,
+      ownerId: users.SYSTEM_OWNER,
+    },
+  });
+  await prisma.rmfStep.createMany({
+    data: (["PREPARE", "CATEGORIZE", "SELECT", "IMPLEMENT", "ASSESS", "AUTHORIZE", "MONITOR"] as const).map((s) => ({ systemId: falcon.id, step: s })),
+  });
+  const controls171Rows = await prisma.control.findMany({ where: { framework: "NIST_800_171" }, orderBy: { controlId: "asc" } });
+  await prisma.controlImplementation.createMany({
+    data: controls171Rows.map((c, i) => ({
+      systemId: falcon.id,
+      controlId: c.id,
+      // Deterministic spread: most implemented, some partial, some not implemented → SPRS < 110.
+      status: i % 7 === 0 ? "NOT_IMPLEMENTED" : i % 5 === 0 ? "PARTIALLY_IMPLEMENTED" : "IMPLEMENTED",
+      narrative: i % 7 === 0 ? "" : "Implemented via enclave baseline configuration and documented procedures.",
+    })),
+  });
+  await prisma.asset.createMany({
+    data: [
+      { systemId: falcon.id, name: "CUI File Server", assetType: "Server", category: "CUI", owner: "IT Ops", location: "Enclave VLAN" },
+      { systemId: falcon.id, name: "Engineering Workstations", assetType: "Workstation", category: "CUI", owner: "Engineering", location: "Enclave VLAN" },
+      { systemId: falcon.id, name: "Microsoft GCC High (M365)", assetType: "Cloud Service", category: "CUI", owner: "IT Ops", location: "Azure GCC High" },
+      { systemId: falcon.id, name: "SIEM / Log Collector", assetType: "Application", category: "SECURITY_PROTECTION", owner: "Security", location: "Enclave VLAN" },
+      { systemId: falcon.id, name: "Managed Firewall", assetType: "Network", category: "SECURITY_PROTECTION", owner: "MSP", location: "Perimeter" },
+      { systemId: falcon.id, name: "Corporate Wiki", assetType: "Application", category: "OUT_OF_SCOPE", owner: "IT Ops", location: "Corporate network" },
+    ],
+  });
+
   // Org policy library
   await prisma.policy.createMany({
     data: [
@@ -358,7 +408,7 @@ async function main() {
       action: "seed.complete",
       entityType: "organization",
       entityId: org.id,
-      metadata: JSON.stringify({ systems: 2, controls: allControls.length }),
+      metadata: JSON.stringify({ systems: 3, controls: allControls.length + controls171Rows.length }),
     },
   });
 

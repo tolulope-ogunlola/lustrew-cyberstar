@@ -27,6 +27,7 @@ export type IconName =
   | "book"
   | "moon"
   | "stamp"
+  | "medal"
   | "arrowRight"
   | "ticket";
 
@@ -70,6 +71,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M5 21h14" />
       <path d="M9 9a3 3 0 1 1 6 0c0 2-1.5 2.5-1.5 4h-3C10.5 11.5 9 11 9 9Z" />
       <path d="M6 17h12v-1a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2Z" />
+    </>
+  ),
+  medal: (
+    <>
+      <path d="M7.5 3h9l-3 6h-3l-3-6Z" />
+      <circle cx="12" cy="15" r="6" />
+      <path d="M12 12.5 13 15h-2l1-2.5Z" />
     </>
   ),
   logout: (

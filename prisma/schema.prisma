@@ -86,6 +86,7 @@ model System {
   ppsmEntries     PpsmEntry[]
   assessments     Assessment[]
   authorizations  AuthorizationDecision[]
+  assets          Asset[]
 
   @@index([orgId])
 }
@@ -96,11 +97,12 @@ model System {
 
 model Control {
   id        String @id @default(cuid())
-  controlId String @unique // e.g. "AC-2"
-  family    String // e.g. "AC"
+  controlId String @unique // e.g. "AC-2" (800-53) or "3.1.1" (800-171)
+  family    String // e.g. "AC" or "3.1"
   title     String
   text      String
   baseline  String @default("MODERATE") // LOW | MODERATE | HIGH
+  framework String @default("NIST_800_53") // NIST_800_53 | NIST_800_171
 
   implementations ControlImplementation[]
 
@@ -531,6 +533,24 @@ model ControlAssessmentResult {
 
   @@unique([assessmentId, controlId])
   @@index([assessmentId])
+}
+
+// CMMC / 800-171 asset inventory & CUI boundary scoping.
+model Asset {
+  id          String   @id @default(cuid())
+  name        String
+  assetType   String   @default("Other") // Server | Workstation | Network | Cloud Service | Application | Mobile | Other
+  category    String   @default("OUT_OF_SCOPE") // CUI | SECURITY_PROTECTION | CONTRACTOR_RISK_MANAGED | SPECIALIZED | OUT_OF_SCOPE
+  description String   @default("")
+  owner       String   @default("")
+  location    String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@index([systemId])
 }
 
 model AuthorizationDecision {
