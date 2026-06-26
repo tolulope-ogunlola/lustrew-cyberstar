@@ -48,6 +48,15 @@ export function Topbar() {
         <span className="font-semibold text-slate-100">{label}</span>
       </div>
       <div className="flex items-center gap-2 text-slate-400">
+        <button
+          onClick={() => window.dispatchEvent(new Event("cyberstar:open-search"))}
+          className="hidden items-center gap-2 rounded-lg border border-ink-800 px-2.5 py-1.5 text-xs hover:bg-ink-800 sm:flex"
+          title="Search (Ctrl/⌘ + K)"
+        >
+          <Icon name="search" className="h-4 w-4" />
+          <span className="text-slate-500">Search…</span>
+          <kbd className="rounded border border-ink-700 px-1 text-[10px] text-slate-500">⌘K</kbd>
+        </button>
         <Link href="/notifications" className="relative flex h-8 w-8 items-center justify-center rounded-lg hover:bg-ink-800" title="Notifications">
           <Icon name="bell" className="h-4 w-4" />
           {unread > 0 && (

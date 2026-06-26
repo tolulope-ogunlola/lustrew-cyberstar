@@ -66,6 +66,17 @@ export const HELP: Record<string, HelpEntry> = {
       ] },
     ],
   },
+  crosswalks: {
+    title: "Framework Crosswalks",
+    intro: "See how NIST 800-53 control families line up with CMMC 2.0, ISO/IEC 27001:2022, and SOC 2.",
+    sections: [
+      { heading: "How to use", items: [
+        "Search by family code (e.g. AC) or by a target reference to find equivalents.",
+        "Use the mappings to scope reciprocity and reuse evidence across frameworks.",
+        "Mappings are family-level aids — confirm individual control applicability before relying on them.",
+      ] },
+    ],
+  },
   evidence: {
     title: "Evidence Vault",
     intro: "Store artifacts (links or uploaded files) and map them to the controls they support.",

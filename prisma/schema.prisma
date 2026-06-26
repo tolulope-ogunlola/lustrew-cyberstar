@@ -83,6 +83,7 @@ model System {
   risks           Risk[]
   stigFindings    StigFinding[]
   ppsmEntries     PpsmEntry[]
+  metricSnapshots MetricSnapshot[]
 
   @@index([orgId])
 }
@@ -424,6 +425,32 @@ model PolicyAck {
   policy   Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
 
   @@unique([policyId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Metric snapshots (daily posture history for trend charts)
+// ---------------------------------------------------------------------------
+
+model MetricSnapshot {
+  id                      String   @id @default(cuid())
+  orgId                   String
+  day                     String // YYYY-MM-DD (one row per system per day)
+  readinessScore          Int      @default(0)
+  posturePercent          Int      @default(0)
+  rmfProgressPercent      Int      @default(0)
+  evidenceCompletePercent Int      @default(0)
+  openPoams               Int      @default(0)
+  overduePoams            Int      @default(0)
+  openVulnCritical        Int      @default(0)
+  openVulnHigh            Int      @default(0)
+  openRisks               Int      @default(0)
+  createdAt               DateTime @default(now())
+
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, day])
+  @@index([orgId, day])
 }
 
 // ---------------------------------------------------------------------------

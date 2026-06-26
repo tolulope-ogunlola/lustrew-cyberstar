@@ -1,7 +1,8 @@
 // Pluggable mailer. The console driver logs messages and keeps a small in-memory outbox so flows
-// like invites and password resets are verifiable in local/dev without an SMTP server. For
-// production, implement an SMTP/SES driver behind the same `send` signature and select it via
-// MAILER_DRIVER — nothing else changes.
+// like invites and password resets are verifiable in local/dev without an SMTP server. Set
+// MAILER_DRIVER=smtp (+ SMTP_* env vars) to deliver via real SMTP/SES in production.
+
+import nodemailer, { type Transporter } from "nodemailer";
 
 export type Email = {
   to: string;
@@ -30,12 +31,35 @@ class ConsoleMailer implements Mailer {
   }
 }
 
+// Real SMTP delivery via nodemailer. Also records to the outbox for the admin view/audit.
+class SmtpMailer implements Mailer {
+  private transport: Transporter;
+  private from: string;
+  constructor() {
+    this.from = process.env.MAIL_FROM || "CyberStar <no-reply@cyberstar.local>";
+    this.transport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === "true",
+      auth:
+        process.env.SMTP_USER && process.env.SMTP_PASS
+          ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+          : undefined,
+    });
+  }
+  async send(msg: { to: string; subject: string; text: string }): Promise<void> {
+    await this.transport.sendMail({ from: this.from, to: msg.to, subject: msg.subject, text: msg.text });
+    const email: Email = { ...msg, sentAt: new Date().toISOString() };
+    outbox.unshift(email);
+    if (outbox.length > OUTBOX_LIMIT) outbox.pop();
+  }
+}
+
 let mailer: Mailer | null = null;
 
 export function getMailer(): Mailer {
   if (mailer) return mailer;
-  // Only the console driver ships today; MAILER_DRIVER selects SMTP/SES once implemented.
-  mailer = new ConsoleMailer();
+  mailer = process.env.MAILER_DRIVER === "smtp" ? new SmtpMailer() : new ConsoleMailer();
   return mailer;
 }
 

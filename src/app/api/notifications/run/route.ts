@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { writeAuditEvent } from "@/lib/audit";
 import { runNotifications } from "@/lib/notifications/run";
+import { recordSnapshots } from "@/lib/metrics/snapshot";
 
 // POST: recompute notifications.
 //  - Authenticated user → runs for their org.
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
     let totals = { created: 0, updated: 0, resolved: 0, total: 0 };
     for (const o of orgs) {
       const r = await runNotifications(o.id);
+      await recordSnapshots(o.id);
       totals = {
         created: totals.created + r.created,
         updated: totals.updated + r.updated,
@@ -29,6 +31,7 @@ export async function POST(req: Request) {
   if (!user) return Response.json({ error: "Not authenticated" }, { status: 401 });
 
   const result = await runNotifications(user.orgId);
+  await recordSnapshots(user.orgId);
   await writeAuditEvent({
     actorId: user.id,
     action: "notifications.run",
