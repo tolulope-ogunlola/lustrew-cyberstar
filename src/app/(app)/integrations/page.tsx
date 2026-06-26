@@ -133,7 +133,7 @@ export default function IntegrationsPage() {
           {(systems ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <a
-          href={emassSystem ? `/api/integrations/emass?systemId=${emassSystem}` : undefined}
+          href={emassSystem ? `/api/integrations/emass?systemId=${encodeURIComponent(emassSystem)}` : undefined}
           className={`btn-primary py-1 text-sm ${emassSystem ? "" : "pointer-events-none opacity-40"}`}
         >
           Download CSV

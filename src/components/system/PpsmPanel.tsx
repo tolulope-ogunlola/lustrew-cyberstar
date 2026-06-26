@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { StatusBadge, apiSend, useApi } from "@/components/ui";
+import { apiSend, useApi } from "@/components/ui";
 
 type Entry = {
   id: string;
