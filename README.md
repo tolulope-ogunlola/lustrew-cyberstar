@@ -4,6 +4,10 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![status](https://img.shields.io/badge/status-beta-orange)]()
 
+![CyberStar core flow: sign in, import a scan, convert a finding to a POA&M, dashboard updates](docs/demo.gif)
+
+<sub>Core flow: sign in → import a Nessus/ACAS scan → convert a finding to a POA&M → dashboard updates.</sub>
+
 Cybersecurity compliance automation for **ATO/A&A, RMF, NIST SP 800-53 control management,
 evidence, POA&M, vulnerability/STIG, risk, continuous monitoring, and audit-ready reporting** —
 with an AI assistant that drafts SSP narratives, POA&M descriptions, and executive summaries
