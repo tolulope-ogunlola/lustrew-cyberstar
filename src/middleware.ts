@@ -18,6 +18,7 @@ const PROTECTED = [
   "/reports",
   "/integrations",
   "/notifications",
+  "/organization",
   "/account",
   "/admin",
   "/audit",

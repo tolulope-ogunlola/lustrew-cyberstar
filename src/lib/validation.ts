@@ -30,6 +30,20 @@ export const passwordChangeSchema = z.object({
   newPassword: passwordSchema,
 });
 
+export const PLAN_IDS = ["FREE", "PRO", "MSP", "ENTERPRISE"] as const;
+export const organizationUpdateSchema = z.object({
+  name: z.string().min(2).max(120).optional(),
+  plan: z.enum(PLAN_IDS).optional(),
+  billingEmail: z.string().email().max(200).or(z.literal("")).optional(),
+});
+
+export const signupSchema = z.object({
+  orgName: z.string().min(2, "Organization name is required").max(120),
+  name: z.string().min(2, "Your name is required").max(120),
+  email: z.string().email().max(200),
+  password: passwordSchema,
+});
+
 export const forgotSchema = z.object({ email: z.string().email() });
 export const resetSchema = z.object({ token: z.string().min(10), password: passwordSchema });
 

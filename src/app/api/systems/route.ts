@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/db";
-import { requireUser, requirePermission, route } from "@/lib/api";
+import { HttpError, requireUser, requirePermission, route } from "@/lib/api";
 import { writeAuditEvent } from "@/lib/audit";
 import { systemCreateSchema } from "@/lib/validation";
 import { serializeFrameworks, withFrameworks } from "@/lib/util";
 import { requirementsForLevel } from "@/lib/cmmc";
+import { canAddSystem, getPlan } from "@/lib/plans";
 
 export async function GET() {
   return route(async () => {
@@ -24,6 +25,12 @@ export async function POST(req: Request) {
   return route(async () => {
     const user = await requirePermission("write", "system");
     const body = systemCreateSchema.parse(await req.json());
+
+    // Enforce the org's plan system limit.
+    const org = await prisma.organization.findUnique({ where: { id: user.orgId }, select: { plan: true, _count: { select: { systems: true } } } });
+    if (org && !canAddSystem(org.plan, org._count.systems)) {
+      throw new HttpError(402, `Your ${getPlan(org.plan).label} plan allows up to ${getPlan(org.plan).maxSystems} system(s). Upgrade your plan to add more.`);
+    }
 
     const system = await prisma.system.create({
       data: {

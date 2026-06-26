@@ -27,6 +27,7 @@ export default async function Home() {
   const user = await currentUser();
   const primaryHref = user ? "/dashboard" : "/login";
   const primaryLabel = user ? "Open dashboard" : "Sign in";
+  const signupEnabled = !user && process.env.SIGNUP_ENABLED === "true";
 
   return (
     <div className="min-h-screen bg-ink-950 text-slate-200">
@@ -44,6 +45,11 @@ export default async function Home() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            {signupEnabled && (
+              <Link href="/signup" className="btn-ghost">
+                Create account
+              </Link>
+            )}
             <Link href={primaryHref} className="btn-primary">
               {primaryLabel}
             </Link>
@@ -69,7 +75,11 @@ export default async function Home() {
           <Link href={primaryHref} className="btn-primary px-5 py-2.5">
             {primaryLabel} <Icon name="arrowRight" className="h-4 w-4" />
           </Link>
-          <a href="#features" className="btn-ghost px-5 py-2.5">Explore features</a>
+          {signupEnabled ? (
+            <Link href="/signup" className="btn-ghost px-5 py-2.5">Create an organization</Link>
+          ) : (
+            <a href="#features" className="btn-ghost px-5 py-2.5">Explore features</a>
+          )}
         </div>
         <p className="mt-4 text-xs text-slate-500">
           Accelerates preparation and visibility — it supports, never replaces, ISSM/AO decisions.

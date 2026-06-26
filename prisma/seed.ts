@@ -63,7 +63,7 @@ async function main() {
 
   // --- Organization + users ---
   const org = await prisma.organization.create({
-    data: { name: "Lustrew Dynamics" },
+    data: { name: "Lustrew Dynamics", plan: "MSP", billingEmail: "billing@lustrewdynamics.com" },
   });
 
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
