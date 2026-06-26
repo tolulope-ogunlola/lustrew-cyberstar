@@ -1,0 +1,491 @@
+// Lustrew CyberStar — data model (first vertical slice).
+// Local dev runs on SQLite (zero-setup). SQLite has no native enums, array columns, Json, or
+// @db.Text, so enum-like fields are plain strings (values validated in src/lib/validation.ts and
+// the string unions in src/lib/types.ts), `frameworks` is a JSON-encoded string, and `metadata`
+// is a JSON string. For production Postgres, swap provider to "postgresql" and these map cleanly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & identity
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users        User[]
+  systems      System[]
+  policies     Policy[]
+  integrations Integration[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String // ADMIN | ATO_SME | ISSO | VULN_ANALYST | SYSTEM_OWNER | EXECUTIVE
+  isActive     Boolean  @default(true)
+  mustChangePassword Boolean @default(false)
+  mfaEnabled   Boolean  @default(false)
+  mfaSecret    String? // base32 TOTP secret (set during enrollment)
+  passwordResetTokenHash String?
+  passwordResetExpires   DateTime?
+  createdAt    DateTime @default(now())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  ownedSystems     System[]                @relation("SystemOwner")
+  ownedControls    ControlImplementation[] @relation("ControlOwner")
+  ownedRmfSteps    RmfStep[]               @relation("RmfStepOwner")
+  ownedPoams       Poam[]                  @relation("PoamOwner")
+  ownedRisks       Risk[]                  @relation("RiskOwner")
+  uploadedEvidence Evidence[]              @relation("EvidenceUploader")
+  auditEvents      AuditEvent[]
+
+  @@index([orgId])
+}
+
+// ---------------------------------------------------------------------------
+// Systems
+// ---------------------------------------------------------------------------
+
+model System {
+  id           String   @id @default(cuid())
+  name         String
+  description  String   @default("")
+  fipsCategory String   @default("MODERATE") // LOW | MODERATE | HIGH
+  frameworks   String   @default("[]") // JSON-encoded string[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orgId   String
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ownerId String?
+  owner   User?        @relation("SystemOwner", fields: [ownerId], references: [id])
+
+  implementations ControlImplementation[]
+  rmfSteps        RmfStep[]
+  evidence        Evidence[]
+  poams           Poam[]
+  vulnerabilities Vulnerability[]
+  scanImports     ScanImport[]
+  risks           Risk[]
+  stigFindings    StigFinding[]
+  ppsmEntries     PpsmEntry[]
+
+  @@index([orgId])
+}
+
+// ---------------------------------------------------------------------------
+// NIST 800-53 control catalog (global) + per-system implementation
+// ---------------------------------------------------------------------------
+
+model Control {
+  id        String @id @default(cuid())
+  controlId String @unique // e.g. "AC-2"
+  family    String // e.g. "AC"
+  title     String
+  text      String
+  baseline  String @default("MODERATE") // LOW | MODERATE | HIGH
+
+  implementations ControlImplementation[]
+
+  @@index([family])
+}
+
+model ControlImplementation {
+  id        String   @id @default(cuid())
+  scoping   String   @default("APPLICABLE") // APPLICABLE | NOT_APPLICABLE | INHERITED | HYBRID | COMPENSATING
+  status    String   @default("NOT_IMPLEMENTED") // NOT_IMPLEMENTED | PLANNED | PARTIALLY_IMPLEMENTED | IMPLEMENTED | RISK_ACCEPTED
+  narrative String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  systemId  String
+  system    System  @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  controlId String
+  control   Control @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  ownerId   String?
+  owner     User?   @relation("ControlOwner", fields: [ownerId], references: [id])
+
+  evidenceLinks EvidenceLink[]
+  poams         Poam[]
+
+  @@unique([systemId, controlId])
+  @@index([systemId])
+}
+
+// ---------------------------------------------------------------------------
+// Evidence vault (many-to-many with control implementations)
+// ---------------------------------------------------------------------------
+
+model Evidence {
+  id          String   @id @default(cuid())
+  title       String
+  type        String   @default("Document") // Screenshot | Policy | Scan | Config | Document ...
+  url         String   @default("") // external link reference (when not an uploaded file)
+  note        String   @default("")
+  // Uploaded-file metadata (null when evidence is a link only).
+  fileRef     String? // opaque storage key, e.g. "local:org/ev/uuid.pdf"
+  fileName    String?
+  fileSize    Int?
+  contentType String?
+  createdAt   DateTime @default(now())
+
+  systemId     String
+  system       System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy   User?  @relation("EvidenceUploader", fields: [uploadedById], references: [id])
+
+  links EvidenceLink[]
+
+  @@index([systemId])
+}
+
+model EvidenceLink {
+  id String @id @default(cuid())
+
+  evidenceId       String
+  evidence         Evidence              @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  implementationId String
+  implementation   ControlImplementation @relation(fields: [implementationId], references: [id], onDelete: Cascade)
+
+  @@unique([evidenceId, implementationId])
+}
+
+// ---------------------------------------------------------------------------
+// RMF lifecycle
+// ---------------------------------------------------------------------------
+
+model RmfStep {
+  id      String    @id @default(cuid())
+  step    String // PREPARE | CATEGORIZE | SELECT | IMPLEMENT | ASSESS | AUTHORIZE | MONITOR
+  status  String    @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | BLOCKED | COMPLETE
+  dueDate DateTime?
+  notes   String    @default("")
+
+  systemId String
+  system   System  @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  ownerId  String?
+  owner    User?   @relation("RmfStepOwner", fields: [ownerId], references: [id])
+
+  @@unique([systemId, step])
+  @@index([systemId])
+}
+
+// ---------------------------------------------------------------------------
+// POA&M
+// ---------------------------------------------------------------------------
+
+model Poam {
+  id                  String    @id @default(cuid())
+  poamNumber          String // human-facing id, e.g. "POAM-0007"
+  weaknessTitle       String
+  weaknessDescription String    @default("")
+  source              String    @default("Manual") // Manual | ControlAssessment | Vulnerability | STIG
+  severity            String    @default("MODERATE") // INFO | LOW | MODERATE | HIGH | CRITICAL
+  riskRating          String    @default("MODERATE")
+  cvss                Float?
+  status              String    @default("OPEN") // OPEN | IN_PROGRESS | PENDING_REVIEW | COMPLETED | RISK_ACCEPTED | CLOSED
+  remediationPlan     String    @default("")
+  residualRisk        String    @default("")
+  scheduledCompletion DateTime?
+  actualCompletion    DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  systemId         String
+  system           System                 @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  ownerId          String?
+  owner            User?                  @relation("PoamOwner", fields: [ownerId], references: [id])
+  implementationId String?
+  implementation   ControlImplementation? @relation(fields: [implementationId], references: [id])
+
+  milestones    PoamMilestone[]
+  statusHistory PoamStatusHistory[]
+
+  @@index([systemId])
+}
+
+model PoamMilestone {
+  id          String    @id @default(cuid())
+  description String
+  dueDate     DateTime?
+  done        Boolean   @default(false)
+
+  poamId String
+  poam   Poam   @relation(fields: [poamId], references: [id], onDelete: Cascade)
+}
+
+// Append-only: rows are never updated or deleted.
+model PoamStatusHistory {
+  id        String   @id @default(cuid())
+  status    String
+  note      String   @default("")
+  changedBy String? // user id
+  createdAt DateTime @default(now())
+
+  poamId String
+  poam   Poam   @relation(fields: [poamId], references: [id], onDelete: Cascade)
+
+  @@index([poamId])
+}
+
+// ---------------------------------------------------------------------------
+// Vulnerabilities (scan ingestion)
+// ---------------------------------------------------------------------------
+
+model Vulnerability {
+  id             String   @id @default(cuid())
+  dedupeKey      String // sha1 of pluginId|host|port|cve — recurring findings collapse to one row
+  pluginId       String?
+  cve            String?
+  title          String
+  description    String   @default("")
+  solution       String   @default("")
+  severity       String   @default("MEDIUM") // INFO | LOW | MEDIUM | HIGH | CRITICAL
+  cvss           Float?
+  host           String?
+  port           String?
+  source         String   @default("CSV") // Nessus | ACAS | CSV | Manual
+  state          String   @default("OPEN") // OPEN | REMEDIATED | RISK_ACCEPTED | FALSE_POSITIVE
+  priority       String   @default("MEDIUM") // IMMEDIATE | HIGH | MEDIUM | LOW
+  priorityScore  Int      @default(0)
+  recommendation String   @default("")
+  mappedControl  String? // NIST control id, e.g. "SI-2"
+  poamId         String? // set when converted to a POA&M
+  firstSeen      DateTime @default(now())
+  lastSeen       DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, dedupeKey])
+  @@index([systemId])
+}
+
+model ScanImport {
+  id           String   @id @default(cuid())
+  fileName     String
+  source       String
+  total        Int      @default(0)
+  created      Int      @default(0)
+  updated      Int      @default(0)
+  importedById String?
+  createdAt    DateTime @default(now())
+
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@index([systemId])
+}
+
+// ---------------------------------------------------------------------------
+// Risk register
+// ---------------------------------------------------------------------------
+
+model Risk {
+  id          String @id @default(cuid())
+  riskNumber  String // "RISK-0001"
+  title       String
+  description String @default("")
+  threat      String @default("")
+  vulnerabilityNarrative String @default("") // free-text weakness (distinct from a linked scan finding)
+
+  // Likelihood/impact on a 1..5 scale: VERY_LOW | LOW | MODERATE | HIGH | VERY_HIGH
+  likelihood         String @default("MODERATE")
+  impact             String @default("MODERATE")
+  residualLikelihood String @default("MODERATE")
+  residualImpact     String @default("MODERATE")
+
+  status            String    @default("OPEN") // OPEN | MITIGATING | ACCEPTED | CLOSED
+  mitigationPlan    String    @default("")
+  acceptanceDecision String   @default("")
+  approvalAuthority String    @default("")
+  targetDate        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Cross-links stored as ids/strings (resolved at the API boundary) to keep the model light.
+  relatedControl  String? // NIST control id, e.g. "RA-3"
+  relatedPoamId   String?
+  relatedVulnId   String?
+
+  systemId String
+  system   System  @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  ownerId  String?
+  owner    User?   @relation("RiskOwner", fields: [ownerId], references: [id])
+
+  @@index([systemId])
+}
+
+// ---------------------------------------------------------------------------
+// STIG checklist findings (.ckl import)
+// ---------------------------------------------------------------------------
+
+model StigFinding {
+  id             String   @id @default(cuid())
+  dedupeKey      String
+  vulnNum        String // V-XXXXX
+  ruleId         String?
+  ruleTitle      String
+  groupTitle     String   @default("")
+  severity       String   @default("CAT_II") // CAT_I | CAT_II | CAT_III
+  status         String   @default("NOT_REVIEWED") // OPEN | NOT_A_FINDING | NOT_APPLICABLE | NOT_REVIEWED
+  findingDetails String   @default("")
+  comments       String   @default("")
+  cci            String   @default("")
+  host           String?
+  stigName       String   @default("")
+  source         String   @default("CKL")
+  mappedControl  String?
+  poamId         String?
+  firstSeen      DateTime @default(now())
+  lastSeen       DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, dedupeKey])
+  @@index([systemId])
+}
+
+// ---------------------------------------------------------------------------
+// PPSM — Ports, Protocols, and Services Management
+// ---------------------------------------------------------------------------
+
+model PpsmEntry {
+  id                String   @id @default(cuid())
+  port              String
+  protocol          String   @default("TCP") // TCP | UDP | ICMP | OTHER
+  service           String
+  direction         String   @default("INBOUND") // INBOUND | OUTBOUND
+  source            String   @default("")
+  destination       String   @default("")
+  justification     String   @default("")
+  status            String   @default("PENDING") // APPROVED | PENDING | DENIED
+  associatedControl String? // e.g. SC-7
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@index([systemId])
+}
+
+// ---------------------------------------------------------------------------
+// Policies & governance
+// ---------------------------------------------------------------------------
+
+model Policy {
+  id         String    @id @default(cuid())
+  title      String
+  framework  String    @default("NIST_RMF")
+  version    String    @default("1.0")
+  status     String    @default("DRAFT") // DRAFT | UNDER_REVIEW | APPROVED | EXPIRED
+  body       String    @default("")
+  url        String    @default("")
+  ownerId    String?
+  reviewDate DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  acks PolicyAck[]
+
+  @@index([orgId])
+}
+
+model PolicyAck {
+  id             String   @id @default(cuid())
+  userId         String
+  userName       String   @default("")
+  acknowledgedAt DateTime @default(now())
+
+  policyId String
+  policy   Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Integrations (external connectors)
+// ---------------------------------------------------------------------------
+
+model Integration {
+  id         String    @id @default(cuid())
+  type       String // TENABLE | QUALYS | SERVICENOW | SHAREPOINT | EMASS
+  name       String
+  enabled    Boolean   @default(true)
+  config     String    @default("{}") // JSON: { mock, baseUrl, accessKey, secretKey, ... } (encrypt at rest in prod)
+  systemId   String? // default target system for scanner sync
+  lastSyncAt DateTime?
+  lastResult String    @default("")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications (continuous-monitoring rule output)
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id         String   @id @default(cuid())
+  orgId      String
+  systemId   String?
+  systemName String?
+  category   String // POAM_OVERDUE | RMF_OVERDUE | VULN_OPEN | RISK_OPEN | RISK_ACCEPT_EXPIRING | EVIDENCE_MISSING
+  severity   String   @default("WARNING") // INFO | WARNING | CRITICAL
+  title      String
+  body       String   @default("")
+  dedupeKey  String // stable per underlying condition; lets re-runs upsert instead of duplicate
+  entityType String?
+  entityId   String?
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([orgId, dedupeKey])
+  @@index([orgId, isRead])
+}
+
+// ---------------------------------------------------------------------------
+// Audit log (append-only)
+// ---------------------------------------------------------------------------
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  action     String // e.g. "system.create", "poam.status_change"
+  entityType String
+  entityId   String?
+  metadata   String? // JSON-encoded object
+  createdAt  DateTime @default(now())
+
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt])
+}

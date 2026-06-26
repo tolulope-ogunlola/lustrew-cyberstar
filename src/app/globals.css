@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Govtech Blue palette. :root = light, .dark = dark. Values are space-separated RGB triples
+   consumed by Tailwind via rgb(var(--x) / <alpha-value>). The ink (surface/border) and slate
+   (text) scales invert between themes so existing utility classes flip correctly. */
+:root {
+  color-scheme: light;
+  --ink-950: 244 247 251; /* page background */
+  --ink-900: 255 255 255; /* surface / cards */
+  --ink-800: 226 232 240; /* borders, subtle hover */
+  --ink-700: 203 213 225;
+  --ink-600: 148 163 184; /* input borders */
+  --slate-100: 11 26 51; /* primary text */
+  --slate-200: 30 41 59;
+  --slate-300: 51 65 85;
+  --slate-400: 71 85 105; /* muted text */
+  --slate-500: 100 116 139;
+  --slate-600: 148 163 184; /* faint */
+  --brand-600: 37 99 235;
+  --brand-500: 59 130 246;
+  --brand-400: 37 99 235; /* logo/accent text — readable blue on light */
+  --brand-300: 29 78 216; /* links — blue-700 */
+  --accent-500: 6 182 212;
+  --accent-400: 8 145 178; /* cyan-600 for light */
+  /* status text (darker for light-mode contrast) */
+  --red-400: 185 28 28;
+  --emerald-300: 4 120 87;
+  --amber-300: 180 83 9;
+  --amber-200: 146 64 14;
+  --sky-300: 3 105 161;
+  --yellow-300: 161 98 7;
+}
+
+.dark {
+  color-scheme: dark;
+  --ink-950: 10 15 28; /* page background */
+  --ink-900: 17 26 46; /* surface / cards */
+  --ink-800: 26 38 64; /* borders, subtle hover */
+  --ink-700: 35 50 82;
+  --ink-600: 47 66 105; /* input borders */
+  --slate-100: 232 238 246; /* primary text */
+  --slate-200: 209 219 234;
+  --slate-300: 180 194 214;
+  --slate-400: 138 154 178; /* muted text */
+  --slate-500: 100 116 142;
+  --slate-600: 71 85 110; /* faint */
+  --brand-600: 37 99 235;
+  --brand-500: 59 130 246;
+  --brand-400: 96 165 250;
+  --brand-300: 147 197 253; /* links — blue-300 */
+  --accent-500: 6 182 212;
+  --accent-400: 34 211 238;
+  /* status text (lighter for dark-mode contrast) */
+  --red-400: 248 113 113;
+  --emerald-300: 110 231 183;
+  --amber-300: 252 211 77;
+  --amber-200: 253 230 138;
+  --sky-300: 125 211 252;
+  --yellow-300: 253 224 71;
+}
+
+html,
+body {
+  @apply bg-ink-950 text-slate-200 antialiased;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-ink-800 bg-ink-900/60 p-5 shadow-sm;
+  }
+  .kpi-card {
+    @apply rounded-2xl border border-ink-800 bg-ink-900/60 p-5 transition hover:border-ink-700;
+  }
+  .icon-tile {
+    @apply flex h-11 w-11 items-center justify-center rounded-xl;
+  }
+  .pill {
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium;
+  }
+  .stat-card {
+    @apply rounded-2xl border border-ink-800 bg-ink-900/60 p-4;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 font-semibold text-white hover:bg-brand-500;
+  }
+  .btn-ghost {
+    @apply btn border border-ink-600 text-slate-200 hover:bg-ink-800;
+  }
+  .input {
+    @apply w-full rounded-lg border border-ink-600 bg-ink-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .th {
+    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400;
+  }
+  .td {
+    @apply px-3 py-2 text-sm text-slate-200 align-top;
+  }
+}

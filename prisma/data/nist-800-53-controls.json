@@ -1,0 +1,76 @@
+[
+  { "controlId": "AC-1", "family": "AC", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate access control policy and procedures; review and update them at an organization-defined frequency." },
+  { "controlId": "AC-2", "family": "AC", "title": "Account Management", "baseline": "LOW", "text": "Manage system accounts, including establishing, activating, modifying, disabling, and removing accounts, and monitor their use." },
+  { "controlId": "AC-3", "family": "AC", "title": "Access Enforcement", "baseline": "LOW", "text": "Enforce approved authorizations for logical access to information and system resources in accordance with applicable access control policies." },
+  { "controlId": "AC-6", "family": "AC", "title": "Least Privilege", "baseline": "MODERATE", "text": "Employ the principle of least privilege, allowing only authorized accesses for users and processes that are necessary to accomplish assigned tasks." },
+  { "controlId": "AC-17", "family": "AC", "title": "Remote Access", "baseline": "LOW", "text": "Establish and document usage restrictions, configuration requirements, and implementation guidance for each type of remote access allowed." },
+
+  { "controlId": "AT-1", "family": "AT", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate awareness and training policy and procedures." },
+  { "controlId": "AT-2", "family": "AT", "title": "Literacy Training and Awareness", "baseline": "LOW", "text": "Provide security and privacy literacy training to system users as part of initial training and at an organization-defined frequency thereafter." },
+  { "controlId": "AT-3", "family": "AT", "title": "Role-Based Training", "baseline": "LOW", "text": "Provide role-based security and privacy training to personnel with assigned security and privacy roles and responsibilities." },
+
+  { "controlId": "AU-1", "family": "AU", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate audit and accountability policy and procedures." },
+  { "controlId": "AU-2", "family": "AU", "title": "Event Logging", "baseline": "LOW", "text": "Identify the types of events that the system is capable of logging and coordinate the logging function with other organizational entities." },
+  { "controlId": "AU-6", "family": "AU", "title": "Audit Record Review, Analysis, and Reporting", "baseline": "LOW", "text": "Review and analyze system audit records for indications of inappropriate or unusual activity and report findings to designated personnel." },
+  { "controlId": "AU-12", "family": "AU", "title": "Audit Record Generation", "baseline": "LOW", "text": "Provide audit record generation capability for the event types the system is capable of auditing on all components." },
+
+  { "controlId": "CA-1", "family": "CA", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate assessment, authorization, and monitoring policy and procedures." },
+  { "controlId": "CA-2", "family": "CA", "title": "Control Assessments", "baseline": "LOW", "text": "Select an assessor, develop an assessment plan, and assess the controls in the system and its environment of operation." },
+  { "controlId": "CA-5", "family": "CA", "title": "Plan of Action and Milestones", "baseline": "LOW", "text": "Develop and update a plan of action and milestones to document remediation of weaknesses and deficiencies found during assessments." },
+  { "controlId": "CA-7", "family": "CA", "title": "Continuous Monitoring", "baseline": "LOW", "text": "Develop and implement a continuous monitoring strategy that includes metrics, monitoring frequencies, and ongoing control assessments." },
+
+  { "controlId": "CM-1", "family": "CM", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate configuration management policy and procedures." },
+  { "controlId": "CM-2", "family": "CM", "title": "Baseline Configuration", "baseline": "LOW", "text": "Develop, document, and maintain a current baseline configuration of the system under configuration control." },
+  { "controlId": "CM-6", "family": "CM", "title": "Configuration Settings", "baseline": "LOW", "text": "Establish, document, and enforce configuration settings that reflect the most restrictive mode consistent with operational requirements." },
+  { "controlId": "CM-8", "family": "CM", "title": "System Component Inventory", "baseline": "LOW", "text": "Develop and maintain an accurate, complete inventory of system components." },
+
+  { "controlId": "CP-1", "family": "CP", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate contingency planning policy and procedures." },
+  { "controlId": "CP-2", "family": "CP", "title": "Contingency Plan", "baseline": "LOW", "text": "Develop a contingency plan that identifies essential missions, recovery objectives, and roles and responsibilities." },
+  { "controlId": "CP-9", "family": "CP", "title": "System Backup", "baseline": "LOW", "text": "Conduct backups of user-level and system-level information at an organization-defined frequency and protect their confidentiality and integrity." },
+
+  { "controlId": "IA-1", "family": "IA", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate identification and authentication policy and procedures." },
+  { "controlId": "IA-2", "family": "IA", "title": "Identification and Authentication (Organizational Users)", "baseline": "LOW", "text": "Uniquely identify and authenticate organizational users and associate that identity with processes acting on their behalf." },
+  { "controlId": "IA-5", "family": "IA", "title": "Authenticator Management", "baseline": "LOW", "text": "Manage system authenticators, including verifying identity, establishing initial content, and protecting authenticators from unauthorized disclosure." },
+
+  { "controlId": "IR-1", "family": "IR", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate incident response policy and procedures." },
+  { "controlId": "IR-4", "family": "IR", "title": "Incident Handling", "baseline": "LOW", "text": "Implement an incident handling capability that includes preparation, detection, analysis, containment, eradication, and recovery." },
+  { "controlId": "IR-6", "family": "IR", "title": "Incident Reporting", "baseline": "LOW", "text": "Require personnel to report suspected incidents to the incident response capability within an organization-defined time period." },
+
+  { "controlId": "MA-1", "family": "MA", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate system maintenance policy and procedures." },
+  { "controlId": "MA-2", "family": "MA", "title": "Controlled Maintenance", "baseline": "LOW", "text": "Schedule, document, and review records of maintenance, repair, and replacement of system components." },
+
+  { "controlId": "MP-1", "family": "MP", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate media protection policy and procedures." },
+  { "controlId": "MP-2", "family": "MP", "title": "Media Access", "baseline": "LOW", "text": "Restrict access to digital and non-digital media to authorized personnel." },
+  { "controlId": "MP-6", "family": "MP", "title": "Media Sanitization", "baseline": "LOW", "text": "Sanitize system media prior to disposal, release out of organizational control, or release for reuse." },
+
+  { "controlId": "PE-1", "family": "PE", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate physical and environmental protection policy and procedures." },
+  { "controlId": "PE-2", "family": "PE", "title": "Physical Access Authorizations", "baseline": "LOW", "text": "Develop, approve, and maintain a list of individuals with authorized access to the facility where the system resides." },
+  { "controlId": "PE-3", "family": "PE", "title": "Physical Access Control", "baseline": "LOW", "text": "Enforce physical access authorizations at entry and exit points to the facility where the system resides." },
+
+  { "controlId": "PL-1", "family": "PL", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate planning policy and procedures." },
+  { "controlId": "PL-2", "family": "PL", "title": "System Security and Privacy Plans", "baseline": "LOW", "text": "Develop security and privacy plans that describe the system boundary, environment of operation, and control implementations." },
+  { "controlId": "PL-8", "family": "PL", "title": "Security and Privacy Architectures", "baseline": "MODERATE", "text": "Develop security and privacy architectures that describe the requirements and approach for protecting confidentiality, integrity, and availability." },
+
+  { "controlId": "PS-1", "family": "PS", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate personnel security policy and procedures." },
+  { "controlId": "PS-3", "family": "PS", "title": "Personnel Screening", "baseline": "LOW", "text": "Screen individuals prior to authorizing access to the system and rescreen at an organization-defined frequency." },
+  { "controlId": "PS-4", "family": "PS", "title": "Personnel Termination", "baseline": "LOW", "text": "Upon termination of individual employment, disable system access and revoke authenticators within an organization-defined time period." },
+
+  { "controlId": "RA-1", "family": "RA", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate risk assessment policy and procedures." },
+  { "controlId": "RA-3", "family": "RA", "title": "Risk Assessment", "baseline": "LOW", "text": "Conduct a risk assessment, including the likelihood and magnitude of harm from unauthorized access, use, disclosure, disruption, or destruction." },
+  { "controlId": "RA-5", "family": "RA", "title": "Vulnerability Monitoring and Scanning", "baseline": "LOW", "text": "Monitor and scan for vulnerabilities in the system and hosted applications and remediate legitimate vulnerabilities in accordance with risk." },
+
+  { "controlId": "SA-1", "family": "SA", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate system and services acquisition policy and procedures." },
+  { "controlId": "SA-3", "family": "SA", "title": "System Development Life Cycle", "baseline": "LOW", "text": "Manage the system using an organization-defined system development life cycle that incorporates security and privacy considerations." },
+  { "controlId": "SA-11", "family": "SA", "title": "Developer Testing and Evaluation", "baseline": "MODERATE", "text": "Require the developer to perform security and privacy testing and evaluation and to remediate flaws identified during testing." },
+
+  { "controlId": "SC-1", "family": "SC", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate system and communications protection policy and procedures." },
+  { "controlId": "SC-7", "family": "SC", "title": "Boundary Protection", "baseline": "LOW", "text": "Monitor and control communications at the external managed interfaces and key internal managed interfaces of the system." },
+  { "controlId": "SC-8", "family": "SC", "title": "Transmission Confidentiality and Integrity", "baseline": "MODERATE", "text": "Protect the confidentiality and integrity of transmitted information using cryptographic mechanisms." },
+  { "controlId": "SC-13", "family": "SC", "title": "Cryptographic Protection", "baseline": "LOW", "text": "Determine the cryptographic uses and implement the cryptographic mechanisms required for each use in accordance with applicable standards." },
+  { "controlId": "SC-28", "family": "SC", "title": "Protection of Information at Rest", "baseline": "MODERATE", "text": "Protect the confidentiality and integrity of information at rest using cryptographic or alternative physical mechanisms." },
+
+  { "controlId": "SI-1", "family": "SI", "title": "Policy and Procedures", "baseline": "LOW", "text": "Develop, document, and disseminate system and information integrity policy and procedures." },
+  { "controlId": "SI-2", "family": "SI", "title": "Flaw Remediation", "baseline": "LOW", "text": "Identify, report, and correct system flaws, and install security-relevant updates within an organization-defined time period of release." },
+  { "controlId": "SI-3", "family": "SI", "title": "Malicious Code Protection", "baseline": "LOW", "text": "Implement malicious code protection mechanisms at system entry and exit points and update them when new releases are available." },
+  { "controlId": "SI-4", "family": "SI", "title": "System Monitoring", "baseline": "LOW", "text": "Monitor the system to detect attacks, indicators of potential attacks, and unauthorized local, network, and remote connections." }
+]
