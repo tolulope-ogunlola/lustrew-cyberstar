@@ -137,6 +137,25 @@ export const HELP: Record<string, HelpEntry> = {
       ] },
     ],
   },
+  authorization: {
+    title: "Assessment & Authorization",
+    intro: "Run a Security Control Assessment (SCA), record the Authorizing Official's decision, and export OSCAL.",
+    sections: [
+      { heading: "Assessments (SCA)", items: [
+        "Starting an assessment seeds a result row per applicable control, prefilled from its current status.",
+        "Set each control to Satisfied / Other than satisfied / Not applicable and capture findings + recommendations.",
+        "Mark the assessment complete once every applicable control is assessed; it then feeds the AI-generated SAR.",
+      ] },
+      { heading: "Authorization decisions", items: [
+        "Record an ATO / ATO-with-conditions / IATT / Denied / Revoked decision with the AO, dates, rationale, and conditions.",
+        "Decisions are immutable history and written to the audit log.",
+      ] },
+      { heading: "OSCAL export", items: [
+        "Download OSCAL 1.1.2 SSP and assessment-results JSON for eMASS/RegScale and other OSCAL tools.",
+        "Inherited/hybrid controls carry their common control provider as control-origination.",
+      ] },
+    ],
+  },
   ppsm: {
     title: "PPSM",
     intro: "Ports, Protocols, and Services Management register for the system boundary.",

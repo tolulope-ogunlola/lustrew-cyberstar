@@ -22,6 +22,7 @@ function dossier(overrides: Partial<SystemDossier> = {}): SystemDossier {
     vulns: [],
     risks: [],
     policies: [],
+    assessment: null,
     ...overrides,
   };
 }

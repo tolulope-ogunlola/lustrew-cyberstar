@@ -24,13 +24,22 @@ export type SystemDossier = {
   vulns: { title: string; severity: string; cve: string | null }[];
   risks: { title: string; status: string; rating: string }[];
   policies: { title: string; status: string; framework: string }[];
+  assessment: {
+    title: string;
+    assessorName: string;
+    completedAt: string | null;
+    satisfied: number;
+    otherThanSatisfied: number;
+    notApplicable: number;
+    findings: { controlId: string; findings: string; recommendation: string }[];
+  } | null;
 };
 
 export async function loadSystemDossier(systemId: string, orgId: string): Promise<SystemDossier | null> {
   const system = await prisma.system.findFirst({ where: { id: systemId, orgId } });
   if (!system) return null;
 
-  const [impls, steps, poams, vulns, risks, policies] = await Promise.all([
+  const [impls, steps, poams, vulns, risks, policies, latestAssessment] = await Promise.all([
     prisma.controlImplementation.findMany({
       where: { systemId },
       include: { control: true, _count: { select: { evidenceLinks: true } } },
@@ -41,6 +50,11 @@ export async function loadSystemDossier(systemId: string, orgId: string): Promis
     prisma.vulnerability.findMany({ where: { systemId, state: "OPEN" }, orderBy: { severity: "asc" } }),
     prisma.risk.findMany({ where: { systemId } }),
     prisma.policy.findMany({ where: { orgId }, select: { title: true, status: true, framework: true } }),
+    prisma.assessment.findFirst({
+      where: { systemId, status: "COMPLETED" },
+      orderBy: { completedAt: "desc" },
+      include: { results: true },
+    }),
   ]);
 
   const forScore: ImplForScore[] = impls.map((i) => ({
@@ -89,6 +103,19 @@ export async function loadSystemDossier(systemId: string, orgId: string): Promis
       .filter((r) => isOpenRisk(r.status))
       .map((r) => ({ title: r.title, status: r.status, rating: riskScore(r.likelihood, r.impact).rating })),
     policies,
+    assessment: latestAssessment
+      ? {
+          title: latestAssessment.title,
+          assessorName: latestAssessment.assessorName,
+          completedAt: latestAssessment.completedAt ? latestAssessment.completedAt.toISOString().slice(0, 10) : null,
+          satisfied: latestAssessment.results.filter((r) => r.result === "SATISFIED").length,
+          otherThanSatisfied: latestAssessment.results.filter((r) => r.result === "OTHER_THAN_SATISFIED").length,
+          notApplicable: latestAssessment.results.filter((r) => r.result === "NOT_APPLICABLE").length,
+          findings: latestAssessment.results
+            .filter((r) => r.result === "OTHER_THAN_SATISFIED")
+            .map((r) => ({ controlId: r.controlId, findings: r.findings, recommendation: r.recommendation })),
+        }
+      : null,
   };
 }
 

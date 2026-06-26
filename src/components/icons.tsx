@@ -26,6 +26,7 @@ export type IconName =
   | "plug"
   | "book"
   | "moon"
+  | "stamp"
   | "arrowRight"
   | "ticket";
 
@@ -64,6 +65,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
+  stamp: (
+    <>
+      <path d="M5 21h14" />
+      <path d="M9 9a3 3 0 1 1 6 0c0 2-1.5 2.5-1.5 4h-3C10.5 11.5 9 11 9 9Z" />
+      <path d="M6 17h12v-1a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2Z" />
+    </>
+  ),
   logout: (
     <>
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
