@@ -4,6 +4,7 @@ import type { IconName } from "@/components/icons";
 // Navigation items in the authenticated shell. Used both for routing and the sidebar.
 export type NavKey =
   | "dashboard"
+  | "copilot"
   | "systems"
   | "controls"
   | "evidence"
@@ -28,6 +29,7 @@ export const NAV_META: Record<
   { label: string; subtitle: string; href: string; icon: IconName; section: NavSection }
 > = {
   dashboard: { label: "Overview", subtitle: "Posture & readiness", href: "/dashboard", icon: "gauge", section: "COMPLIANCE" },
+  copilot: { label: "AI Copilot", subtitle: "Chat, gaps & doc generation", href: "/copilot", icon: "bolt", section: "COMPLIANCE" },
   systems: { label: "Systems", subtitle: "Authorization boundaries", href: "/systems", icon: "server", section: "COMPLIANCE" },
   controls: { label: "Controls", subtitle: "NIST 800-53 library", href: "/controls", icon: "shield", section: "COMPLIANCE" },
   evidence: { label: "Evidence", subtitle: "Artifacts & mapping", href: "/evidence", icon: "folder", section: "COMPLIANCE" },
@@ -47,10 +49,10 @@ export const NAV_META: Record<
 // Which nav items each role sees. Executives get a read-only posture view; system owners
 // work on their assigned systems; admins see everything including the audit log.
 export const ROLE_NAV: Record<Role, NavKey[]> = {
-  ADMIN: ["dashboard", "systems", "controls", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications", "users", "audit"],
-  ATO_SME: ["dashboard", "systems", "controls", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications"],
-  ISSO: ["dashboard", "systems", "controls", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications"],
-  VULN_ANALYST: ["dashboard", "systems", "vulnerabilities", "stig", "poams", "reports", "notifications"],
+  ADMIN: ["dashboard", "copilot", "systems", "controls", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications", "users", "audit"],
+  ATO_SME: ["dashboard", "copilot", "systems", "controls", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications"],
+  ISSO: ["dashboard", "copilot", "systems", "controls", "evidence", "vulnerabilities", "stig", "poams", "risks", "ppsm", "policies", "reports", "integrations", "notifications"],
+  VULN_ANALYST: ["dashboard", "copilot", "systems", "vulnerabilities", "stig", "poams", "reports", "notifications"],
   SYSTEM_OWNER: ["dashboard", "systems", "evidence", "ppsm", "policies", "notifications"],
   EXECUTIVE: ["dashboard", "risks", "policies", "reports", "notifications"],
 };

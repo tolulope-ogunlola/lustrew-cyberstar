@@ -45,6 +45,24 @@ export const HELP: Record<string, HelpEntry> = {
       ] },
     ],
   },
+  copilot: {
+    title: "AI Compliance Copilot",
+    intro: "Ask grounded questions, run a gap analysis, and generate draft SSP/SAR documents — all from the selected system's data.",
+    sections: [
+      { heading: "Chat", items: [
+        "Answers are grounded only in the chosen system's controls, POA&Ms, vulnerabilities, and risks.",
+        "Source chips show which controls/POA&Ms informed the answer.",
+      ] },
+      { heading: "Gap Analysis", items: [
+        "Detects unimplemented controls, missing evidence/narratives, overdue POA&Ms, and open findings/risks.",
+        "Returns a prioritized path to ATO; gaps are computed deterministically, then narrated by AI.",
+      ] },
+      { heading: "Documents", items: [
+        "Generate a draft System Security Plan or Security Assessment Report and download it as Markdown.",
+        "Everything is a draft for human review — never a final authorization decision.",
+      ] },
+    ],
+  },
   systems: {
     title: "Systems",
     intro: "Each system is an authorization boundary. Open one to work its full compliance lifecycle.",

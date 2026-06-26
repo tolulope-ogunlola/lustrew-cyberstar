@@ -204,3 +204,19 @@ export const aiDraftSchema = z.object({
   implementationId: z.string().optional(),
   poamId: z.string().optional(),
 });
+
+export const aiChatSchema = z.object({
+  systemId: z.string(),
+  question: z.string().min(1).max(2000),
+  history: z
+    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(8000) }))
+    .max(20)
+    .optional(),
+});
+
+export const aiGapSchema = z.object({ systemId: z.string() });
+
+export const aiDocSchema = z.object({
+  systemId: z.string(),
+  kind: z.enum(["ssp", "sar"]),
+});
