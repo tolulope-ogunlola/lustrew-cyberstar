@@ -2,7 +2,7 @@
 // animated GIF for the README. Requires a running dev server (npm run dev) with the demo seed.
 //   node scripts/demo-gif.mjs
 import { chromium } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -18,7 +18,8 @@ mkdirSync(OUT, { recursive: true });
 
 // A scan with a unique host so each run yields a fresh OPEN finding to convert.
 const host = `10.0.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
-const csvPath = join(tmpdir(), "cyberstar-demo-scan.csv");
+// Write into a private, per-run temp directory (0700) rather than a predictable shared path.
+const csvPath = join(mkdtempSync(join(tmpdir(), "cyberstar-demo-")), "scan.csv");
 writeFileSync(
   csvPath,
   [
