@@ -18,9 +18,11 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  plan         String   @default("FREE") // FREE | PRO | MSP | ENTERPRISE
+  billingEmail String   @default("")
+  createdAt    DateTime @default(now())
 
   users        User[]
   systems      System[]

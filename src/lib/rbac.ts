@@ -21,6 +21,7 @@ export type NavKey =
   | "reports"
   | "integrations"
   | "notifications"
+  | "organization"
   | "users"
   | "audit";
 
@@ -50,6 +51,7 @@ export const NAV_META: Record<
   reports: { label: "Reports", subtitle: "Export PDF / XLSX / CSV", href: "/reports", icon: "doc", section: "SYSTEM" },
   integrations: { label: "Integrations", subtitle: "Connected platforms", href: "/integrations", icon: "plug", section: "SYSTEM" },
   notifications: { label: "Notifications", subtitle: "Alerts & reminders", href: "/notifications", icon: "bell", section: "SYSTEM" },
+  organization: { label: "Organization", subtitle: "Plan, billing & usage", href: "/organization", icon: "coins", section: "SYSTEM" },
   users: { label: "Users", subtitle: "Accounts & roles", href: "/admin/users", icon: "users", section: "SYSTEM" },
   audit: { label: "Audit Log", subtitle: "Activity & changes", href: "/audit", icon: "list", section: "SYSTEM" },
 };
@@ -57,7 +59,7 @@ export const NAV_META: Record<
 // Which nav items each role sees. Executives get a read-only posture view; system owners
 // work on their assigned systems; admins see everything including the audit log.
 export const ROLE_NAV: Record<Role, NavKey[]> = {
-  ADMIN: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "reports", "integrations", "notifications", "users", "audit"],
+  ADMIN: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "reports", "integrations", "notifications", "organization", "users", "audit"],
   ATO_SME: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "reports", "integrations", "notifications"],
   ISSO: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "reports", "integrations", "notifications"],
   VULN_ANALYST: ["dashboard", "copilot", "systems", "vulnerabilities", "stig", "poams", "reports", "notifications"],

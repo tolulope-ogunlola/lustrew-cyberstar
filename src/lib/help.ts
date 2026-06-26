@@ -254,6 +254,20 @@ export const HELP: Record<string, HelpEntry> = {
       ] },
     ],
   },
+  organization: {
+    title: "Organization & Plan",
+    intro: "Your tenant's subscription tier and usage. Each organization is an isolated workspace.",
+    sections: [
+      { heading: "What you see", items: [
+        "Current plan, price, and usage (systems vs. the plan's limit; member count).",
+        "Plan tiers from Starter to Enterprise — system limits scale with the tier.",
+      ] },
+      { heading: "Actions", items: [
+        "Admins can switch plans here (self-serve for the demo; production routes through billing).",
+        "The system limit is enforced when creating new systems.",
+      ] },
+    ],
+  },
   users: {
     title: "User Management",
     intro: "Admin-only: manage accounts, roles, and access for your organization.",
