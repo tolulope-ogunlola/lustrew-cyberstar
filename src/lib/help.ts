@@ -84,6 +84,24 @@ export const HELP: Record<string, HelpEntry> = {
       ] },
     ],
   },
+  cmmc: {
+    title: "CMMC Readiness",
+    intro: "Track NIST SP 800-171 implementation, your SPRS score, and CUI asset scoping for a CMMC assessment.",
+    sections: [
+      { heading: "Getting started", items: [
+        "Create a system with the CMMC Level 1/2 or NIST 800-171 framework — the 110 requirements (or the 17 L1 practices) generate automatically.",
+        "Work each requirement on the system's Controls tab; status IMPLEMENTED counts as met.",
+      ] },
+      { heading: "What you see", items: [
+        "SPRS score (DoD Assessment Methodology estimate, floor −203) and percent implemented.",
+        "Coverage by 800-171 family with the related 800-53 family for evidence reuse.",
+        "A prioritized gap list — highest SPRS point-impact first — showing what blocks your assessment.",
+      ] },
+      { heading: "Asset inventory", items: [
+        "Categorize assets (CUI / Security Protection / Contractor Risk Managed / Specialized / Out of Scope) to define your assessment boundary.",
+      ] },
+    ],
+  },
   evidence: {
     title: "Evidence Vault",
     intro: "Store artifacts (links or uploaded files) and map them to the controls they support.",

@@ -41,6 +41,9 @@ export const FRAMEWORKS = [
   "NIST_RMF",
   "NIST_800_53",
   "NIST_800_37",
+  "NIST_800_171",
+  "CMMC_L1",
+  "CMMC_L2",
   "FISMA",
   "FEDRAMP_READY",
   "SOC2",
@@ -226,6 +229,20 @@ export const assessmentResultUpdateSchema = z.object({
   result: z.enum(ASSESSMENT_RESULTS).optional(),
   findings: z.string().max(8000).optional(),
   recommendation: z.string().max(8000).optional(),
+});
+
+// --- CMMC / 800-171 asset inventory ---
+export const ASSET_CATEGORIES = ["CUI", "SECURITY_PROTECTION", "CONTRACTOR_RISK_MANAGED", "SPECIALIZED", "OUT_OF_SCOPE"] as const;
+export const ASSET_TYPES = ["Server", "Workstation", "Network", "Cloud Service", "Application", "Mobile", "Other"] as const;
+
+export const assetCreateSchema = z.object({
+  systemId: z.string(),
+  name: z.string().min(1).max(200),
+  assetType: z.enum(ASSET_TYPES).optional(),
+  category: z.enum(ASSET_CATEGORIES).optional(),
+  description: z.string().max(2000).optional(),
+  owner: z.string().max(200).optional(),
+  location: z.string().max(200).optional(),
 });
 
 export const authorizationCreateSchema = z.object({
