@@ -14,7 +14,27 @@ with an AI assistant that drafts SSP narratives, POA&M descriptions, and executi
 > **[DEPLOYMENT.md](DEPLOYMENT.md)** before any production/internet-facing use, and never run the
 > demo seed (default credentials) in such an environment.
 
-> Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+> Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)**. Architecture overview:
+> **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
+## Screenshots
+
+| Continuous-monitoring dashboard | System workspace — controls |
+| --- | --- |
+| ![Dashboard](docs/screenshots/dashboard-dark.png) | ![Controls](docs/screenshots/system-controls-dark.png) |
+
+| Risk register — 5×5 heatmap | Reports (PDF / XLSX / CSV) |
+| --- | --- |
+| ![Risk heatmap](docs/screenshots/system-risks-dark.png) | ![Reports](docs/screenshots/reports-dark.png) |
+
+| Contextual help panel | Public landing page |
+| --- | --- |
+| ![Help panel](docs/screenshots/help-panel-dark.png) | ![Landing](docs/screenshots/landing-dark.png) |
+
+**Light mode** is fully supported (system-aware toggle): ![Dashboard in light mode](docs/screenshots/dashboard-light.png)
+
+> Screenshots are generated from the running app with `npm run dev` + `npm run screenshots`
+> (Playwright). Regenerate them after UI changes.
 
 ## Stack
 

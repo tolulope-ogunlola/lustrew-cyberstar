@@ -13,6 +13,7 @@
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
+    "screenshots": "node scripts/screenshots.mjs",
     "db:provider:sqlite": "tsx scripts/set-db-provider.ts sqlite",
     "db:provider:postgres": "tsx scripts/set-db-provider.ts postgresql",
     "db:migrate:dev": "prisma migrate dev",
