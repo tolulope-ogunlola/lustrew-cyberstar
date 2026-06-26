@@ -1,0 +1,19 @@
+title = "Lustrew CyberStar — gitleaks config"
+
+# Use the full default ruleset, then allowlist known demo / example / CI placeholder values.
+# These are intentionally public (no real credentials); the real .env is gitignored.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Demo, example, and CI placeholder values — not real secrets."
+regexTarget = "line"
+regexes = [
+  '''ci-placeholder-secret-ci-placeholder-secret''',
+  '''change-me-to-a-long-random-string''',
+  '''cyberstar-insecure-dev-key''',
+  '''Password123!''',
+]
+paths = [
+  '''(^|/)\.env\.example$''',
+]
