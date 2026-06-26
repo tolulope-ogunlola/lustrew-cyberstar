@@ -371,10 +371,10 @@ function ExportTab({ systemId }: { systemId: string }) {
         Download machine-readable OSCAL 1.1.2 JSON for ingestion by eMASS, RegScale, or other OSCAL-aware tools.
       </p>
       <div className="flex flex-wrap gap-2">
-        <a className="btn-primary" href={`/api/systems/${systemId}/oscal?type=ssp`}>
+        <a className="btn-primary" href={`/api/systems/${encodeURIComponent(systemId)}/oscal?type=ssp`}>
           <Icon name="doc" className="h-4 w-4" /> OSCAL SSP
         </a>
-        <a className="btn-ghost" href={`/api/systems/${systemId}/oscal?type=assessment`}>
+        <a className="btn-ghost" href={`/api/systems/${encodeURIComponent(systemId)}/oscal?type=assessment`}>
           <Icon name="doc" className="h-4 w-4" /> OSCAL Assessment Results (latest completed)
         </a>
       </div>
