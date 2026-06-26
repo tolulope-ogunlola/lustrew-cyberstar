@@ -10,7 +10,7 @@ export const passwordSchema = z
     message: "Password must include at least one letter and one number",
   });
 
-export const ROLES = ["ADMIN", "ATO_SME", "ISSO", "VULN_ANALYST", "SYSTEM_OWNER", "EXECUTIVE"] as const;
+export const ROLES = ["ADMIN", "ATO_SME", "ISSO", "VULN_ANALYST", "SYSTEM_OWNER", "EXECUTIVE", "ASSESSOR"] as const;
 
 export const userCreateSchema = z.object({
   name: z.string().min(2).max(120),
@@ -274,4 +274,16 @@ export const aiDocSchema = z.object({
 export const aiPolicyAnalysisSchema = z.object({
   systemId: z.string(),
   text: z.string().min(20, "Paste at least a paragraph of policy text").max(50000),
+});
+
+// --- Assessor: request-more-evidence workflow ---
+export const evidenceRequestCreateSchema = z.object({
+  systemId: z.string(),
+  controlId: z.string().min(1).max(40),
+  note: z.string().max(4000).optional(),
+});
+
+export const evidenceRequestResolveSchema = z.object({
+  status: z.enum(["OPEN", "RESOLVED"]),
+  response: z.string().max(4000).optional(),
 });

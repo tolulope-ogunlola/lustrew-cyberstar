@@ -16,6 +16,7 @@ export type ReportTable = {
 
 export const REPORT_TYPES = [
   "executive",
+  "conmon",
   "controls",
   "poam",
   "vulnerabilities",
@@ -25,6 +26,7 @@ export type ReportType = (typeof REPORT_TYPES)[number];
 
 export const REPORT_META: Record<ReportType, { label: string; description: string }> = {
   executive: { label: "Executive Summary", description: "ATO readiness, posture, and key risk indicators" },
+  conmon: { label: "Monthly Continuous Monitoring", description: "30-day ConMon package: posture, POA&M/vuln activity, and the action list" },
   controls: { label: "Control Implementation", description: "NIST 800-53 status, scoping, and evidence coverage" },
   poam: { label: "POA&M Report", description: "Open items, milestones, and aging" },
   vulnerabilities: { label: "Vulnerability Assessment", description: "Findings by severity with remediation priority" },
@@ -225,6 +227,73 @@ async function gatherExecutive(systemId: string): Promise<ReportTable> {
   };
 }
 
+// Monthly continuous-monitoring package: 30-day posture + POA&M/vuln activity + the action list.
+async function gatherConMon(systemId: string): Promise<ReportTable> {
+  const since = new Date(Date.now() - 30 * 86_400_000);
+  const [system, impls, steps, allPoams, openVulns, newVulns, risks] = await Promise.all([
+    prisma.system.findUnique({ where: { id: systemId }, select: { name: true, fipsCategory: true } }),
+    prisma.controlImplementation.findMany({
+      where: { systemId },
+      select: { status: true, scoping: true, narrative: true, _count: { select: { evidenceLinks: true } } },
+    }),
+    prisma.rmfStep.findMany({ where: { systemId }, select: { status: true } }),
+    prisma.poam.findMany({ where: { systemId }, select: { status: true, poamNumber: true, weaknessTitle: true, severity: true, scheduledCompletion: true, actualCompletion: true, createdAt: true } }),
+    prisma.vulnerability.findMany({ where: { systemId, state: "OPEN" }, select: { severity: true } }),
+    prisma.vulnerability.findMany({ where: { systemId, firstSeen: { gte: since } }, select: { severity: true } }),
+    prisma.risk.findMany({ where: { systemId }, select: { status: true, likelihood: true, impact: true } }),
+  ]);
+
+  const forScore: ImplForScore[] = impls.map((i) => ({ status: i.status, scoping: i.scoping, narrative: i.narrative, _evidenceCount: i._count.evidenceLinks }));
+  const score = computeScore(forScore, steps, allPoams);
+  const now = Date.now();
+  const closedStatuses = ["COMPLETED", "CLOSED", "RISK_ACCEPTED"];
+  const openedThisPeriod = allPoams.filter((p) => p.createdAt >= since).length;
+  const closedThisPeriod = allPoams.filter((p) => p.actualCompletion && p.actualCompletion >= since).length;
+  const overdue = allPoams.filter(
+    (p) => p.scheduledCompletion && !p.actualCompletion && !closedStatuses.includes(p.status) && p.scheduledCompletion.getTime() < now,
+  );
+  const critical = openVulns.filter((v) => v.severity === "CRITICAL").length;
+  const high = openVulns.filter((v) => v.severity === "HIGH").length;
+  const openRisks = risks.filter((r) => r.status === "OPEN" || r.status === "MITIGATING").length;
+
+  // Action list: overdue POA&Ms (the items the AO/ISSO must drive this month).
+  const rows: ReportRow[] = overdue
+    .sort((a, b) => (a.scheduledCompletion!.getTime() - b.scheduledCompletion!.getTime()))
+    .map((p) => ({
+      poam: p.poamNumber,
+      weakness: p.weaknessTitle,
+      severity: p.severity,
+      due: fmtDate(p.scheduledCompletion),
+      status: p.status.replaceAll("_", " "),
+    }));
+
+  return {
+    title: "Monthly Continuous Monitoring Report",
+    system: system?.name ?? "Unknown system",
+    generatedAt: new Date().toISOString(),
+    summary: [
+      { label: "Reporting period", value: `${fmtDate(since)} to ${fmtDate(new Date())}` },
+      { label: "FIPS 199 categorization", value: system?.fipsCategory ?? "" },
+      { label: "ATO readiness score", value: `${score.readinessScore} / 100` },
+      { label: "Control posture", value: `${score.posturePercent}%` },
+      { label: "Open POA&Ms", value: `${score.openPoams} (${score.overduePoams} overdue)` },
+      { label: "POA&Ms opened this period", value: `${openedThisPeriod}` },
+      { label: "POA&Ms closed this period", value: `${closedThisPeriod}` },
+      { label: "Open vulnerabilities", value: `${openVulns.length} (${critical} critical, ${high} high)` },
+      { label: "New vulnerabilities this period", value: `${newVulns.length}` },
+      { label: "Open risks", value: `${openRisks}` },
+    ],
+    columns: [
+      { key: "poam", label: "POA&M", width: 16 },
+      { key: "weakness", label: "Weakness", width: 40 },
+      { key: "severity", label: "Severity", width: 12 },
+      { key: "due", label: "Scheduled", width: 14 },
+      { key: "status", label: "Status", width: 18 },
+    ],
+    rows,
+  };
+}
+
 export function gatherReport(type: ReportType, systemId: string): Promise<ReportTable> {
   switch (type) {
     case "controls":
@@ -237,5 +306,7 @@ export function gatherReport(type: ReportType, systemId: string): Promise<Report
       return gatherRisks(systemId);
     case "executive":
       return gatherExecutive(systemId);
+    case "conmon":
+      return gatherConMon(systemId);
   }
 }

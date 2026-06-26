@@ -8,7 +8,7 @@ import { deriveResultFromStatus } from "@/lib/assessment";
 const prisma = new PrismaClient();
 
 // Role is a plain string column (SQLite has no enums).
-type Role = "ADMIN" | "ATO_SME" | "ISSO" | "VULN_ANALYST" | "SYSTEM_OWNER" | "EXECUTIVE";
+type Role = "ADMIN" | "ATO_SME" | "ISSO" | "VULN_ANALYST" | "SYSTEM_OWNER" | "EXECUTIVE" | "ASSESSOR";
 
 type ControlSeed = {
   controlId: string;
@@ -27,6 +27,7 @@ const DEMO_USERS: { email: string; name: string; role: Role }[] = [
   { email: "vuln@cyberstar.gov", name: "Vic Vuln", role: "VULN_ANALYST" },
   { email: "owner@cyberstar.gov", name: "Owen Owner", role: "SYSTEM_OWNER" },
   { email: "exec@cyberstar.gov", name: "Erin Exec", role: "EXECUTIVE" },
+  { email: "assessor@cyberstar.gov", name: "Alex Assessor", role: "ASSESSOR" },
 ];
 
 const RMF_STEPS = [
@@ -391,6 +392,28 @@ async function main() {
       rationale: "Residual risk is acceptable given compensating controls and the active POA&M remediation plan.",
       conditions: "Close all overdue POA&Ms within 90 days; submit monthly continuous-monitoring reports.",
       signedById: users.ADMIN,
+    },
+  });
+
+  // Assessor evidence requests against Atlas (one open, one resolved).
+  await prisma.evidenceRequest.create({
+    data: {
+      systemId: atlas.id,
+      controlId: "AU-6",
+      note: "Please provide the audit-review SOP and a sample of the weekly log-review records.",
+      status: "OPEN",
+      requestedById: users.ASSESSOR,
+    },
+  });
+  await prisma.evidenceRequest.create({
+    data: {
+      systemId: atlas.id,
+      controlId: "AC-2",
+      note: "Need the account-management procedure and evidence of quarterly access reviews.",
+      status: "RESOLVED",
+      response: "Uploaded AC-2 procedure and Q1 access-review attestation to the evidence vault.",
+      resolvedAt: new Date(),
+      requestedById: users.ASSESSOR,
     },
   });
 
