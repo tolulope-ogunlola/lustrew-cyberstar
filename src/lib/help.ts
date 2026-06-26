@@ -189,6 +189,20 @@ export const HELP: Record<string, HelpEntry> = {
       ] },
     ],
   },
+  assessor: {
+    title: "Assessor Packet",
+    intro: "A read-only review surface for assessors: control status, evidence coverage, and an evidence-request workflow.",
+    sections: [
+      { heading: "Review", items: [
+        "Browse controls by family with status, scoping, and linked-evidence counts; ⚠ marks controls with no evidence.",
+        "Assessors have read-only access to the platform — they cannot change controls, POA&Ms, or decisions.",
+      ] },
+      { heading: "Request more evidence", items: [
+        "Click Request evidence on a control and describe what's needed; the team sees it here and resolves with a response.",
+        "Open requests are flagged so nothing falls through the cracks.",
+      ] },
+    ],
+  },
   ppsm: {
     title: "PPSM",
     intro: "Ports, Protocols, and Services Management register for the system boundary.",

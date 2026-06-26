@@ -27,6 +27,14 @@ describe("rbac.can", () => {
     expect(can("VULN_ANALYST", "write", "poam")).toBe(true);
     expect(can("VULN_ANALYST", "write", "control")).toBe(false);
   });
+
+  it("ASSESSOR is read-only except raising evidence requests", () => {
+    expect(can("ASSESSOR", "read", "control")).toBe(true);
+    expect(can("ASSESSOR", "read", "evidence")).toBe(true);
+    expect(can("ASSESSOR", "write", "control")).toBe(false);
+    expect(can("ASSESSOR", "write", "poam")).toBe(false);
+    expect(can("ASSESSOR", "write", "evidenceRequest")).toBe(true);
+  });
 });
 
 describe("ROLE_NAV", () => {

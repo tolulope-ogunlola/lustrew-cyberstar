@@ -52,6 +52,7 @@ model User {
   ownedRisks       Risk[]                  @relation("RiskOwner")
   uploadedEvidence Evidence[]              @relation("EvidenceUploader")
   signedAuthorizations AuthorizationDecision[] @relation("AuthorizationSigner")
+  evidenceRequests EvidenceRequest[]      @relation("EvidenceRequester")
   auditEvents      AuditEvent[]
 
   @@index([orgId])
@@ -88,6 +89,7 @@ model System {
   assessments     Assessment[]
   authorizations  AuthorizationDecision[]
   assets          Asset[]
+  evidenceRequests EvidenceRequest[]
 
   @@index([orgId])
 }
@@ -576,6 +578,24 @@ model Asset {
 
   systemId String
   system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@index([systemId])
+}
+
+// Assessor "request more evidence" workflow — read-only assessors flag a control needing more proof.
+model EvidenceRequest {
+  id         String    @id @default(cuid())
+  controlId  String // control id snapshot, e.g. "AC-2" or "3.1.1"
+  note       String    @default("") // what the assessor needs
+  status     String    @default("OPEN") // OPEN | RESOLVED
+  response   String    @default("") // the team's reply on resolution
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  systemId      String
+  system        System  @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  requestedById String?
+  requestedBy   User?   @relation("EvidenceRequester", fields: [requestedById], references: [id])
 
   @@index([systemId])
 }

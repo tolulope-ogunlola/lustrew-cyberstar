@@ -7,7 +7,8 @@ export type Role =
   | "ISSO"
   | "VULN_ANALYST"
   | "SYSTEM_OWNER"
-  | "EXECUTIVE";
+  | "EXECUTIVE"
+  | "ASSESSOR";
 
 export type ImplementationStatus =
   | "NOT_IMPLEMENTED"

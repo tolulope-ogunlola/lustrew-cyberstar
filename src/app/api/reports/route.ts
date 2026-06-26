@@ -8,6 +8,7 @@ import { FORMAT_META, renderReport, type ReportFormat } from "@/lib/report/forma
 // Which read permission each report requires.
 const REPORT_ENTITY: Record<ReportType, Entity> = {
   executive: "system",
+  conmon: "system",
   controls: "control",
   poam: "poam",
   vulnerabilities: "vuln",
