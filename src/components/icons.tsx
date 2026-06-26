@@ -26,6 +26,7 @@ export type IconName =
   | "plug"
   | "book"
   | "moon"
+  | "search"
   | "stamp"
   | "medal"
   | "arrowRight"
@@ -66,6 +67,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </>
+  ),
   stamp: (
     <>
       <path d="M5 21h14" />

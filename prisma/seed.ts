@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { recordSnapshots } from "@/lib/metrics/snapshot";
 import { deriveResultFromStatus } from "@/lib/assessment";
 
 const prisma = new PrismaClient();
@@ -297,13 +298,49 @@ async function main() {
     frameworks: ["NIST_RMF", "NIST_800_53", "FISMA", "FEDRAMP_READY"],
     maturityOffset: 0,
   });
-  await buildSystem({
+  const helix = await buildSystem({
     name: "Helix Data Exchange",
     description: "Inter-agency data exchange service in early authorization.",
     fips: "HIGH",
     frameworks: ["NIST_RMF", "NIST_800_53", "FISMA"],
     maturityOffset: 2,
   });
+  const seededSystems = [atlas, helix];
+
+  // --- 30 days of historical posture snapshots so dashboard trend charts render immediately ---
+  // Today's row is the real computed posture; prior days trend gently upward toward it.
+  await recordSnapshots(org.id);
+  const clamp = (n: number) => Math.max(0, Math.round(n));
+  for (const sys of seededSystems) {
+    const today = await prisma.metricSnapshot.findUnique({
+      where: { systemId_day: { systemId: sys.id, day: new Date().toISOString().slice(0, 10) } },
+    });
+    if (!today) continue;
+    for (let d = 30; d >= 1; d--) {
+      // ramp 0..1 from oldest (lower posture, more open items) to most recent.
+      const t = (30 - d) / 30;
+      const wobble = ((d * 7) % 5) - 2; // small deterministic noise
+      const day = new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10);
+      await prisma.metricSnapshot.upsert({
+        where: { systemId_day: { systemId: sys.id, day } },
+        update: {},
+        create: {
+          systemId: sys.id,
+          orgId: org.id,
+          day,
+          readinessScore: clamp(today.readinessScore * (0.55 + 0.45 * t) + wobble),
+          posturePercent: clamp(today.posturePercent * (0.55 + 0.45 * t) + wobble),
+          rmfProgressPercent: clamp(today.rmfProgressPercent * (0.6 + 0.4 * t)),
+          evidenceCompletePercent: clamp(today.evidenceCompletePercent * (0.5 + 0.5 * t)),
+          openPoams: clamp(today.openPoams + (1 - t) * 6 + wobble),
+          overduePoams: clamp(today.overduePoams + (1 - t) * 3),
+          openVulnCritical: clamp(today.openVulnCritical + (1 - t) * 4),
+          openVulnHigh: clamp(today.openVulnHigh + (1 - t) * 8 + wobble),
+          openRisks: clamp(today.openRisks + (1 - t) * 5),
+        },
+      });
+    }
+  }
 
   // --- Assessment & Authorization demo data (Atlas) ---
   // Mark a couple of Atlas controls as inherited from a common control provider.

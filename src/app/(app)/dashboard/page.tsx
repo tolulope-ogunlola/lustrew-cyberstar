@@ -6,7 +6,25 @@ import { useSession } from "next-auth/react";
 import { StatusBadge, useApi } from "@/components/ui";
 import { AiDraftPanel } from "@/components/AiDraftPanel";
 import { GettingStarted } from "@/components/GettingStarted";
+import { TrendChart } from "@/components/TrendChart";
 import { Icon, type IconName } from "@/components/icons";
+
+type Snapshot = { day: string; readinessScore: number; posturePercent: number; openPoams: number; openVulnCritical: number; openVulnHigh: number };
+
+function TrendSection({ systemId }: { systemId: string }) {
+  const { data } = useApi<Snapshot[]>(`/api/metrics/history?systemId=${systemId}&days=30`);
+  if (!data) return null;
+  return (
+    <div className="mt-4">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Trends (last 30 days)</h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <TrendChart label="ATO readiness" suffix="" points={data.map((d) => d.readinessScore)} />
+        <TrendChart label="Control posture" suffix="%" points={data.map((d) => d.posturePercent)} color="rgb(var(--accent-500))" />
+        <TrendChart label="Open POA&Ms" points={data.map((d) => d.openPoams)} color="rgb(248 113 113)" />
+      </div>
+    </div>
+  );
+}
 
 type SystemRow = { id: string; name: string; fipsCategory: string };
 
@@ -204,6 +222,8 @@ export default function DashboardPage() {
             <SmallStat icon="folder" value={`${data.score.evidenceCompletePercent}%`} label="Evidence complete" />
             <SmallStat icon="alert" value={`${data.score.overduePoams}`} label="Overdue POA&Ms" warn={data.score.overduePoams > 0} />
           </div>
+
+          {systemId && <TrendSection systemId={systemId} />}
 
           <div className="mt-6">
             <button className="btn-ghost" onClick={() => setShowAi(true)}>

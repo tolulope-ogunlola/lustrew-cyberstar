@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import { WelcomeModal } from "@/components/WelcomeModal";
+import { CommandPalette } from "@/components/CommandPalette";
 
 export default async function AppLayout({
   children,
@@ -22,6 +23,7 @@ export default async function AppLayout({
         </main>
       </div>
       <WelcomeModal />
+      <CommandPalette />
     </div>
   );
 }
