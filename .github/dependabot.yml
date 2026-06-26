@@ -5,12 +5,15 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    # Batch routine updates into one PR.
     groups:
-      # Batch low-risk updates into single PRs to reduce noise.
-      dev-dependencies:
-        dependency-type: "development"
-      minor-and-patch:
+      npm-minor-patch:
         update-types: ["minor", "patch"]
+    # Major upgrades (e.g. Next, Prisma, Tailwind, ESLint) have breaking changes — handle those
+    # manually with a migration, not via auto-PRs.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
