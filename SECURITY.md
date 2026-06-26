@@ -8,7 +8,7 @@ itself seriously.
 **Please do not open public issues for security vulnerabilities.**
 
 Report privately via **GitHub Security Advisories** ("Report a vulnerability" on the Security tab)
-or email **security@lustrewdynamics.com**. Include reproduction steps, affected version/commit, and
+or email **contact@lustrewdynamics.com**. Include reproduction steps, affected version/commit, and
 impact. We aim to acknowledge within 3 business days and to provide a remediation timeline after triage.
 
 ## Supported versions
