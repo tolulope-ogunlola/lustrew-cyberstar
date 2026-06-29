@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![status](https://img.shields.io/badge/status-beta-orange)]()
 
-https://github.com/tolulope-ogunlola/lustrew-cyberstar/raw/main/docs/brag.mp4
+![CyberStar core flow: sign in, import a scan, convert a finding to a POA&M, dashboard updates](docs/demo.gif)
 
 <sub>Core flow: sign in → import a Nessus/ACAS scan → convert a finding to a POA&M → dashboard updates.</sub>
 
