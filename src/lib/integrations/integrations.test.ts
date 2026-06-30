@@ -98,6 +98,15 @@ describe("ServiceNow push (mock)", () => {
 
 describe("registry", () => {
   it("lists all connectors with capabilities", () => {
-    expect(CONNECTORS.map((c) => c.type).sort()).toEqual(["EMASS", "QUALYS", "SERVICENOW", "SHAREPOINT", "TENABLE"]);
+    expect(CONNECTORS.map((c) => c.type).sort()).toEqual([
+      "AWS", "EMASS", "GITHUB", "GOOGLE_WS", "M365", "OCI", "QUALYS", "SERVICENOW", "SHAREPOINT", "TENABLE",
+    ]);
+  });
+
+  it("exposes the CCM check connectors with the CHECK capability", () => {
+    for (const t of ["GITHUB", "M365", "GOOGLE_WS", "AWS", "OCI"]) {
+      const meta = CONNECTORS.find((c) => c.type === t);
+      expect(meta?.capabilities).toContain("CHECK");
+    }
   });
 });

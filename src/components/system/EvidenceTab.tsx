@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiSend, useApi } from "@/components/ui";
+import { apiSend, useApi, StatusBadge } from "@/components/ui";
 
 type EvidenceRow = {
   id: string;
@@ -10,12 +10,20 @@ type EvidenceRow = {
   url: string;
   note: string;
   createdAt: string;
+  approvalStatus: string;
+  validUntil?: string | null;
+  cadenceDays?: number;
+  reviewedAt?: string | null;
+  reviewer?: { name: string } | null;
+  stale?: boolean;
   hasFile?: boolean;
   fileName?: string | null;
   fileSize?: number | null;
   uploadedBy: { name: string } | null;
   links: { implementation: { control: { controlId: string } } }[];
 };
+
+const APPROVER_ROLES = ["ADMIN", "ATO_SME", "ISSO"];
 
 function humanSize(bytes?: number | null): string {
   if (!bytes) return "";
@@ -29,7 +37,22 @@ type ImplLite = { id: string; control: { controlId: string; title: string } };
 export function EvidenceTab({ systemId }: { systemId: string }) {
   const { data, loading, refetch } = useApi<EvidenceRow[]>(`/api/evidence?systemId=${systemId}`);
   const { data: impls } = useApi<ImplLite[]>(`/api/controls?systemId=${systemId}`);
+  const { data: me } = useApi<{ role: string }>("/api/account");
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const canApprove = !!me && APPROVER_ROLES.includes(me.role);
+
+  async function transition(id: string, approvalStatus: string) {
+    setBusyId(id);
+    try {
+      await apiSend(`/api/evidence/${id}/status`, "PATCH", { approvalStatus });
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Transition failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <div>
@@ -46,9 +69,15 @@ export function EvidenceTab({ systemId }: { systemId: string }) {
           <div key={e.id} className="card">
             <div className="flex items-start justify-between">
               <div>
-                <div className="font-medium text-slate-100">{e.title}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-slate-100">{e.title}</span>
+                  <StatusBadge value={e.approvalStatus} />
+                  {e.stale && <span className="badge bg-red-500/15 text-red-700 dark:text-red-300">stale</span>}
+                </div>
                 <div className="mt-0.5 text-xs text-slate-500">
                   {e.type} · {e.uploadedBy?.name ?? "—"} · {new Date(e.createdAt).toLocaleDateString()}
+                  {e.validUntil && <> · valid until {new Date(e.validUntil).toLocaleDateString()}</>}
+                  {e.reviewer?.name && <> · reviewed by {e.reviewer.name}</>}
                 </div>
                 {e.url && (
                   <a href={e.url} target="_blank" className="mt-1 block text-xs text-brand-300 hover:underline">
@@ -64,15 +93,44 @@ export function EvidenceTab({ systemId }: { systemId: string }) {
                   </a>
                 )}
               </div>
-              <button
-                className="text-xs text-red-400 hover:underline"
-                onClick={async () => {
-                  await apiSend(`/api/evidence/${e.id}`, "DELETE");
-                  refetch();
-                }}
-              >
-                Delete
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {(e.approvalStatus === "DRAFT" || e.approvalStatus === "REJECTED" || e.approvalStatus === "EXPIRED") && (
+                  <button
+                    className="text-xs text-brand-300 hover:underline disabled:opacity-50"
+                    disabled={busyId === e.id}
+                    onClick={() => transition(e.id, "SUBMITTED")}
+                  >
+                    Submit for review
+                  </button>
+                )}
+                {canApprove && (e.approvalStatus === "SUBMITTED" || e.approvalStatus === "UNDER_REVIEW") && (
+                  <>
+                    <button
+                      className="text-xs text-emerald-400 hover:underline disabled:opacity-50"
+                      disabled={busyId === e.id}
+                      onClick={() => transition(e.id, "APPROVED")}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      className="text-xs text-amber-400 hover:underline disabled:opacity-50"
+                      disabled={busyId === e.id}
+                      onClick={() => transition(e.id, "REJECTED")}
+                    >
+                      Reject
+                    </button>
+                  </>
+                )}
+                <button
+                  className="text-xs text-red-400 hover:underline"
+                  onClick={async () => {
+                    await apiSend(`/api/evidence/${e.id}`, "DELETE");
+                    refetch();
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">
               {e.links.length ? (
@@ -119,6 +177,7 @@ function AddEvidenceModal({
   const [type, setType] = useState("Document");
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");
+  const [cadenceDays, setCadenceDays] = useState(0);
   const [file, setFile] = useState<File | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -140,6 +199,7 @@ function AddEvidenceModal({
         fd.set("title", title);
         fd.set("type", type);
         fd.set("note", note);
+        fd.set("cadenceDays", String(cadenceDays));
         fd.set("implementationIds", JSON.stringify(selected));
         fd.set("file", file);
         const res = await fetch("/api/evidence/upload", { method: "POST", body: fd });
@@ -151,6 +211,7 @@ function AddEvidenceModal({
           type,
           url,
           note,
+          cadenceDays,
           implementationIds: selected,
         });
       }
@@ -205,6 +266,22 @@ function AddEvidenceModal({
           <div>
             <label className="label">Note</label>
             <textarea className="input h-16" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Recollection cadence</label>
+            <select
+              className="input"
+              value={cadenceDays}
+              onChange={(e) => setCadenceDays(Number(e.target.value))}
+            >
+              <option value={0}>No expiry (one-time)</option>
+              <option value={90}>Quarterly (90 days)</option>
+              <option value={180}>Semi-annual (180 days)</option>
+              <option value={365}>Annual (365 days)</option>
+            </select>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Approved evidence auto-expires after this period and must be refreshed.
+            </p>
           </div>
           <div>
             <label className="label">Link to controls ({selected.length} selected)</label>

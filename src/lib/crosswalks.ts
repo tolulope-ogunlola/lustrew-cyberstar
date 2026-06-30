@@ -38,3 +38,26 @@ export const CROSSWALK_FRAMEWORKS = [
   { key: "iso27001", label: "ISO/IEC 27001:2022" },
   { key: "soc2", label: "SOC 2 (TSC)" },
 ] as const;
+
+// Derive the 800-53 family code from a control id, e.g. "AC-2" -> "AC", "SC-7(4)" -> "SC".
+export function familyOf(controlId: string): string {
+  const m = controlId.match(/^([A-Z]{2})-/);
+  return m ? m[1] : controlId;
+}
+
+export type EquivalentRef = { framework: "ISO_27001" | "SOC2" | "CMMC"; ref: string };
+
+// Informational cross-references for a NIST 800-53 control. The crosswalk is family-level and
+// directional (NIST -> others), so these are surfaced in the UI as "mapped/inherited" hints —
+// NOT an authoritative one-to-one satisfaction. Returns [] for control ids outside the 800-53
+// scheme (e.g. commercial-catalog controls), where no reverse mapping is asserted.
+export function equivalentControls(framework: string, controlId: string): EquivalentRef[] {
+  if (framework !== "NIST_800_53") return [];
+  const row = CROSSWALKS.find((r) => r.family === familyOf(controlId));
+  if (!row) return [];
+  const refs: EquivalentRef[] = [];
+  if (row.iso27001 && row.iso27001 !== "—") refs.push({ framework: "ISO_27001", ref: row.iso27001 });
+  if (row.soc2 && row.soc2 !== "—") refs.push({ framework: "SOC2", ref: row.soc2 });
+  if (row.cmmc && row.cmmc !== "—") refs.push({ framework: "CMMC", ref: row.cmmc });
+  return refs;
+}

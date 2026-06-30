@@ -57,3 +57,20 @@ export function recordLoginFailure(key: string): void {
 export function clearLoginFailures(key: string): void {
   store.clear(key);
 }
+
+// Generic sliding-window counter for non-login surfaces (e.g. public Trust Center endpoints).
+// Independent of the login buckets above. Returns true when the action is allowed.
+const counters = new Map<string, { count: number; firstAt: number }>();
+export function checkRateLimit(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  if (counters.size > 10000) {
+    for (const [k, b] of counters) if (now - b.firstAt > windowMs) counters.delete(k);
+  }
+  const b = counters.get(key);
+  if (!b || now - b.firstAt > windowMs) {
+    counters.set(key, { count: 1, firstAt: now });
+    return true;
+  }
+  b.count++;
+  return b.count <= max;
+}

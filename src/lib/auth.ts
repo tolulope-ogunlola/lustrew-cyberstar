@@ -59,6 +59,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           role: user.role as Role,
           orgId: user.orgId,
+          isExternal: user.isExternal,
         };
       },
     }),
@@ -69,6 +70,7 @@ export const authOptions: NextAuthOptions = {
         token.role = (user as { role: Role }).role;
         token.orgId = (user as { orgId: string }).orgId;
         token.uid = (user as { id: string }).id;
+        token.isExternal = (user as { isExternal?: boolean }).isExternal ?? false;
       }
       return token;
     },
@@ -77,6 +79,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.uid as string;
         session.user.role = token.role as Role;
         session.user.orgId = token.orgId as string;
+        (session.user as { isExternal?: boolean }).isExternal = (token.isExternal as boolean) ?? false;
       }
       return session;
     },
@@ -89,6 +92,7 @@ export type SessionUser = {
   name: string;
   role: Role;
   orgId: string;
+  isExternal?: boolean;
 };
 
 /** Server-side helper: returns the typed session user, or null if not signed in. */

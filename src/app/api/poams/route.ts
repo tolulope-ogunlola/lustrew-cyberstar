@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { HttpError, requireUser, requirePermission, route } from "@/lib/api";
+import { HttpError, requireUser, requirePermission, route, requireSystemAccess, scopedSystemIds } from "@/lib/api";
 import { writeAuditEvent } from "@/lib/audit";
 import { poamCreateSchema } from "@/lib/validation";
 
@@ -9,8 +9,10 @@ export async function GET(req: Request) {
   return route(async () => {
     const user = await requireUser();
     const systemId = new URL(req.url).searchParams.get("systemId");
+    if (systemId) await requireSystemAccess(user, systemId, "poams");
+    const scoped = await scopedSystemIds(user); // external auditors: limit to engagement systems
     return prisma.poam.findMany({
-      where: { system: { orgId: user.orgId }, ...(systemId ? { systemId } : {}) },
+      where: { system: { orgId: user.orgId }, ...(systemId ? { systemId } : scoped ? { systemId: { in: scoped } } : {}) },
       orderBy: { createdAt: "desc" },
       include: {
         system: { select: { id: true, name: true } },

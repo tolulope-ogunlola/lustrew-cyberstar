@@ -92,6 +92,15 @@ export const implementationUpdateSchema = z.object({
   ownerId: z.string().nullable().optional(),
 });
 
+export const EVIDENCE_APPROVAL_STATUS = [
+  "DRAFT",
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "APPROVED",
+  "REJECTED",
+  "EXPIRED",
+] as const;
+
 export const evidenceCreateSchema = z.object({
   systemId: z.string(),
   title: z.string().min(2).max(200),
@@ -99,6 +108,16 @@ export const evidenceCreateSchema = z.object({
   url: z.string().max(2000).optional().default(""),
   note: z.string().max(4000).optional().default(""),
   implementationIds: z.array(z.string()).optional().default([]),
+  validUntil: z.string().datetime().nullable().optional(),
+  cadenceDays: z.number().int().min(0).max(3650).optional().default(0),
+  collectedAt: z.string().datetime().nullable().optional(),
+});
+
+// Approval/transition action. Authors may submit; only approvers may review/approve/reject
+// (enforced in the route via RBAC + canTransition).
+export const evidenceStatusSchema = z.object({
+  approvalStatus: z.enum(EVIDENCE_APPROVAL_STATUS),
+  reviewNote: z.string().max(4000).optional(),
 });
 
 export const evidenceLinkSchema = z.object({
@@ -300,4 +319,219 @@ export const evidenceRequestCreateSchema = z.object({
 export const evidenceRequestResolveSchema = z.object({
   status: z.enum(["OPEN", "RESOLVED"]),
   response: z.string().max(4000).optional(),
+});
+
+// --- Vendor / third-party risk ---
+export const DATA_SENSITIVITY = ["NONE", "PUBLIC", "INTERNAL", "CONFIDENTIAL", "PII", "PHI", "CUI"] as const;
+export const VENDOR_CRITICALITY = ["LOW", "MODERATE", "HIGH", "CRITICAL"] as const;
+export const VENDOR_STATUS = ["PROSPECTIVE", "ACTIVE", "UNDER_REVIEW", "OFFBOARDING", "TERMINATED"] as const;
+export const REVIEW_CADENCE = ["NONE", "QUARTERLY", "SEMIANNUAL", "ANNUAL", "BIENNIAL"] as const;
+export const VENDOR_RISK_RATING = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+export const VENDOR_REVIEW_STATUS = ["NOT_STARTED", "QUESTIONNAIRE_SENT", "QUESTIONNAIRE_RECEIVED", "IN_REVIEW", "COMPLETED", "OVERDUE"] as const;
+export const VENDOR_DOC_TYPE = ["SOC2_TYPE2", "SOC2_TYPE1", "ISO_27001", "PENTEST", "DPA", "BAA", "CONTRACT", "QUESTIONNAIRE", "OTHER"] as const;
+
+export const vendorCreateSchema = z.object({
+  name: z.string().min(2).max(200),
+  businessPurpose: z.string().max(4000).optional().default(""),
+  dataSensitivity: z.enum(DATA_SENSITIVITY).default("NONE"),
+  criticality: z.enum(VENDOR_CRITICALITY).default("MODERATE"),
+  status: z.enum(VENDOR_STATUS).default("PROSPECTIVE"),
+  reviewCadence: z.enum(REVIEW_CADENCE).default("ANNUAL"),
+  riskRating: z.enum(VENDOR_RISK_RATING).optional(),
+  nextReviewDate: z.string().datetime().nullable().optional(),
+  renewalDate: z.string().datetime().nullable().optional(),
+  contactName: z.string().max(200).optional().default(""),
+  contactEmail: z.string().email().max(200).or(z.literal("")).optional().default(""),
+  website: z.string().max(2000).optional().default(""),
+  hasDpa: z.boolean().optional().default(false),
+  dpaExpiresAt: z.string().datetime().nullable().optional(),
+  ownerId: z.string().nullable().optional(),
+});
+export const vendorUpdateSchema = vendorCreateSchema.partial();
+
+export const vendorReviewCreateSchema = z.object({
+  reviewType: z.enum(["ONBOARDING", "PERIODIC", "INCIDENT", "RENEWAL"]).default("PERIODIC"),
+  dueDate: z.string().datetime().nullable().optional(),
+  reviewerId: z.string().nullable().optional(),
+});
+export const vendorReviewUpdateSchema = z.object({
+  status: z.enum(VENDOR_REVIEW_STATUS).optional(),
+  questionnaireSentAt: z.string().datetime().nullable().optional(),
+  questionnaireReceivedAt: z.string().datetime().nullable().optional(),
+  findings: z.string().max(8000).optional(),
+  mitigationPlan: z.string().max(8000).optional(),
+  residualRiskRating: z.enum(VENDOR_RISK_RATING).optional(),
+  dueDate: z.string().datetime().nullable().optional(),
+  reviewerId: z.string().nullable().optional(),
+});
+export const vendorDocumentCreateSchema = z.object({
+  docType: z.enum(VENDOR_DOC_TYPE).default("OTHER"),
+  title: z.string().min(2).max(200),
+  url: z.string().max(2000).optional().default(""),
+  validUntil: z.string().datetime().nullable().optional(),
+  note: z.string().max(4000).optional().default(""),
+  evidenceId: z.string().nullable().optional(),
+});
+
+// --- Personnel compliance ---
+export const PERSONNEL_TYPE = ["EMPLOYEE", "CONTRACTOR", "INTERN", "SERVICE_ACCOUNT"] as const;
+export const PERSONNEL_STATUS = ["ONBOARDING", "ACTIVE", "OFFBOARDING", "OFFBOARDED"] as const;
+export const BG_CHECK_STATUS = ["NOT_STARTED", "PENDING", "CLEARED", "FAILED", "EXEMPT"] as const;
+export const TRAINING_STATUS = ["ASSIGNED", "IN_PROGRESS", "COMPLETED", "OVERDUE", "WAIVED"] as const;
+export const ACCESS_REVIEW_STATUS = ["PENDING", "IN_PROGRESS", "CERTIFIED", "REVOKED", "OVERDUE"] as const;
+export const ONBOARD_PHASE = ["ONBOARDING", "OFFBOARDING"] as const;
+
+export const personnelCreateSchema = z.object({
+  fullName: z.string().min(2).max(200),
+  email: z.string().email().max(200).or(z.literal("")).optional().default(""),
+  personnelType: z.enum(PERSONNEL_TYPE).default("EMPLOYEE"),
+  department: z.string().max(120).optional().default(""),
+  jobTitle: z.string().max(120).optional().default(""),
+  status: z.enum(PERSONNEL_STATUS).default("ACTIVE"),
+  startDate: z.string().datetime().nullable().optional(),
+  endDate: z.string().datetime().nullable().optional(),
+  bgCheckStatus: z.enum(BG_CHECK_STATUS).default("NOT_STARTED"),
+  bgCheckDate: z.string().datetime().nullable().optional(),
+  deviceAssignment: z.string().max(200).optional().default(""),
+  userId: z.string().nullable().optional(),
+});
+export const personnelUpdateSchema = personnelCreateSchema.partial();
+
+export const trainingCourseCreateSchema = z.object({
+  name: z.string().min(2).max(200),
+  description: z.string().max(2000).optional().default(""),
+  cadenceDays: z.number().int().min(0).max(3650).optional().default(365),
+  active: z.boolean().optional().default(true),
+});
+export const trainingCourseUpdateSchema = trainingCourseCreateSchema.partial();
+
+export const trainingAssignmentCreateSchema = z.object({
+  courseId: z.string(),
+  dueDate: z.string().datetime().nullable().optional(),
+});
+export const trainingAssignmentUpdateSchema = z.object({
+  status: z.enum(TRAINING_STATUS).optional(),
+  dueDate: z.string().datetime().nullable().optional(),
+  score: z.number().int().min(0).max(100).nullable().optional(),
+  certificateEvidenceId: z.string().nullable().optional(),
+});
+
+export const accessReviewCreateSchema = z.object({
+  scope: z.string().max(200).optional().default(""),
+  dueDate: z.string().datetime().nullable().optional(),
+  reviewerId: z.string().nullable().optional(),
+});
+export const accessReviewUpdateSchema = z.object({
+  status: z.enum(ACCESS_REVIEW_STATUS).optional(),
+  decision: z.string().max(40).optional(),
+  dueDate: z.string().datetime().nullable().optional(),
+  reviewerId: z.string().nullable().optional(),
+  notes: z.string().max(4000).optional(),
+});
+
+export const onboardingTaskCreateSchema = z.object({
+  phase: z.enum(ONBOARD_PHASE).default("ONBOARDING"),
+  title: z.string().min(2).max(200),
+  dueDate: z.string().datetime().nullable().optional(),
+  sortOrder: z.number().int().min(0).max(1000).optional().default(0),
+});
+export const onboardingTaskUpdateSchema = z.object({
+  done: z.boolean().optional(),
+  title: z.string().min(2).max(200).optional(),
+  dueDate: z.string().datetime().nullable().optional(),
+  sortOrder: z.number().int().min(0).max(1000).optional(),
+});
+
+// --- Continuous controls monitoring (CCM) ---
+export const checkAssignSchema = z.object({
+  systemId: z.string(),
+  checkId: z.string(),
+  integrationId: z.string().nullable().optional(),
+  enabled: z.boolean().optional().default(true),
+  params: z.record(z.unknown()).optional().default({}),
+});
+export const checkAssignUpdateSchema = z.object({
+  enabled: z.boolean().optional(),
+  integrationId: z.string().nullable().optional(),
+  params: z.record(z.unknown()).optional(),
+});
+
+// --- Trust Center ---
+export const TRUST_DOC_CATEGORY = ["SOC2", "ISO_CERT", "PENTEST", "POLICY", "OTHER"] as const;
+export const TRUST_DOC_VISIBILITY = ["PUBLIC", "GATED"] as const;
+
+export const trustCenterUpdateSchema = z.object({
+  slug: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, and hyphens only").optional(),
+  published: z.boolean().optional(),
+  companyName: z.string().max(200).optional(),
+  headline: z.string().max(300).optional(),
+  overview: z.string().max(20000).optional(),
+  frameworks: z.array(z.string().max(40)).optional(),
+  subprocessors: z.array(z.object({ name: z.string().max(120), purpose: z.string().max(200), location: z.string().max(120) })).optional(),
+  statusUrl: z.string().max(2000).optional(),
+  contactEmail: z.string().email().max(200).or(z.literal("")).optional(),
+});
+export const trustDocumentSchema = z.object({
+  title: z.string().min(2).max(200),
+  category: z.enum(TRUST_DOC_CATEGORY).default("OTHER"),
+  visibility: z.enum(TRUST_DOC_VISIBILITY).default("GATED"),
+  evidenceId: z.string().nullable().optional(),
+  url: z.string().max(2000).optional().default(""),
+  requiresNda: z.boolean().optional().default(true),
+});
+export const accessRequestPublicSchema = z.object({
+  email: z.string().email().max(200),
+  name: z.string().max(200).optional().default(""),
+  company: z.string().max(200).optional().default(""),
+  reason: z.string().max(2000).optional().default(""),
+  requestedDocs: z.array(z.string()).min(1, "Select at least one document"),
+});
+export const ndaAcceptSchema = z.object({
+  accessRequestId: z.string(),
+  acceptedName: z.string().min(2).max(200),
+  ndaVersion: z.string().max(20),
+});
+export const accessDecisionSchema = z.object({
+  decision: z.enum(["APPROVE", "DENY"]),
+  expiresInDays: z.number().int().min(1).max(90).optional().default(7),
+});
+
+// --- Questionnaire automation ---
+export const ANSWER_STATUS = ["DRAFT", "APPROVED", "RETIRED"] as const;
+export const QUESTIONNAIRE_ITEM_STATUS = ["PENDING", "DRAFTED", "APPROVED", "NEEDS_INPUT"] as const;
+
+export const answerLibrarySchema = z.object({
+  question: z.string().min(3).max(2000),
+  answer: z.string().min(1).max(8000),
+  category: z.string().max(80).optional().default("General"),
+  tags: z.array(z.string().max(40)).optional().default([]),
+  status: z.enum(ANSWER_STATUS).optional().default("APPROVED"),
+});
+export const answerLibraryUpdateSchema = answerLibrarySchema.partial();
+
+export const questionnaireCreateSchema = z.object({
+  name: z.string().min(2).max(200),
+  customer: z.string().max(200).optional().default(""),
+});
+export const questionnaireItemUpdateSchema = z.object({
+  approvedAnswer: z.string().max(8000).optional(),
+  draftAnswer: z.string().max(8000).optional(),
+  status: z.enum(QUESTIONNAIRE_ITEM_STATUS).optional(),
+});
+
+// --- External auditor engagements ---
+export const ENGAGEMENT_SCOPES = ["controls", "evidence", "policies", "poams", "risks", "audit"] as const;
+
+export const auditEngagementCreateSchema = z.object({
+  systemId: z.string(),
+  auditorEmail: z.string().email().max(200),
+  auditorName: z.string().min(2).max(200),
+  scopes: z.array(z.enum(ENGAGEMENT_SCOPES)).min(1),
+  expiresInDays: z.number().int().min(1).max(365).optional().default(30),
+  title: z.string().max(200).optional().default(""),
+});
+export const auditEngagementUpdateSchema = z.object({
+  status: z.enum(["ACTIVE", "REVOKED"]).optional(),
+  scopes: z.array(z.enum(ENGAGEMENT_SCOPES)).optional(),
+  expiresInDays: z.number().int().min(1).max(365).optional(),
 });

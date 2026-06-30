@@ -45,9 +45,15 @@ describe("ROLE_NAV", () => {
     }
   });
 
-  it("limits EXECUTIVE to read-only dashboard, risk register, and reports", () => {
-    expect(ROLE_NAV.EXECUTIVE).toEqual(["dashboard", "risks", "authorization", "policies", "reports", "notifications"]);
+  it("limits EXECUTIVE to read-only posture, governance, and reports", () => {
+    expect(ROLE_NAV.EXECUTIVE).toEqual([
+      "dashboard", "risks", "authorization", "policies", "vendors", "personnel", "reports", "notifications",
+    ]);
     expect(can("EXECUTIVE", "read", "risk")).toBe(true);
     expect(can("EXECUTIVE", "write", "risk")).toBe(false);
+    // Executives can view the new registers but not edit them.
+    expect(can("EXECUTIVE", "read", "vendor")).toBe(true);
+    expect(can("EXECUTIVE", "write", "vendor")).toBe(false);
+    expect(can("EXECUTIVE", "read", "personnel")).toBe(true);
   });
 });

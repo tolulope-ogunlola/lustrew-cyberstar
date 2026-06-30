@@ -29,13 +29,17 @@ async function main() {
   const rows = parseOscalCatalog(await loadSource(arg));
   console.log(`Parsed ${rows.length} controls. Upserting…`);
 
-  const existing = new Set((await prisma.control.findMany({ select: { controlId: true } })).map((c) => c.controlId));
+  // OSCAL import targets the NIST 800-53 catalog.
+  const FRAMEWORK = "NIST_800_53";
+  const existing = new Set(
+    (await prisma.control.findMany({ where: { framework: FRAMEWORK }, select: { controlId: true } })).map((c) => c.controlId)
+  );
   let created = 0;
   let updated = 0;
   for (const r of rows) {
     await prisma.control.upsert({
-      where: { controlId: r.controlId },
-      create: { controlId: r.controlId, family: r.family, title: r.title, text: r.text, baseline: r.baseline },
+      where: { framework_controlId: { framework: FRAMEWORK, controlId: r.controlId } },
+      create: { controlId: r.controlId, family: r.family, title: r.title, text: r.text, baseline: r.baseline, framework: FRAMEWORK },
       update: { family: r.family, title: r.title, text: r.text },
     });
     if (existing.has(r.controlId)) updated++;
