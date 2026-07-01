@@ -18,11 +18,17 @@ export type NavKey =
   | "assessor"
   | "ppsm"
   | "policies"
+  | "vendors"
+  | "personnel"
+  | "checks"
+  | "questionnaires"
+  | "trust"
   | "reports"
   | "integrations"
   | "notifications"
   | "organization"
   | "users"
+  | "auditors"
   | "audit";
 
 export type NavSection = "COMPLIANCE" | "SYSTEM";
@@ -48,24 +54,30 @@ export const NAV_META: Record<
   assessor: { label: "Assessor Packet", subtitle: "Read-only review & evidence requests", href: "/assessor", icon: "search", section: "COMPLIANCE" },
   ppsm: { label: "PPSM", subtitle: "Ports, protocols, services", href: "/ppsm", icon: "plug", section: "COMPLIANCE" },
   policies: { label: "Policies", subtitle: "Governance & acknowledgements", href: "/policies", icon: "book", section: "COMPLIANCE" },
+  vendors: { label: "Vendors", subtitle: "Third-party risk", href: "/vendors", icon: "scale", section: "COMPLIANCE" },
+  personnel: { label: "Personnel", subtitle: "Training, access & onboarding", href: "/personnel", icon: "users", section: "COMPLIANCE" },
+  checks: { label: "Automated Checks", subtitle: "Continuous controls monitoring", href: "/checks", icon: "check", section: "COMPLIANCE" },
+  questionnaires: { label: "Questionnaires", subtitle: "Security questionnaire automation", href: "/questionnaires", icon: "doc", section: "COMPLIANCE" },
+  trust: { label: "Trust Center", subtitle: "Public profile & document sharing", href: "/trust", icon: "shield", section: "SYSTEM" },
   reports: { label: "Reports", subtitle: "Export PDF / XLSX / CSV", href: "/reports", icon: "doc", section: "SYSTEM" },
   integrations: { label: "Integrations", subtitle: "Connected platforms", href: "/integrations", icon: "plug", section: "SYSTEM" },
   notifications: { label: "Notifications", subtitle: "Alerts & reminders", href: "/notifications", icon: "bell", section: "SYSTEM" },
   organization: { label: "Organization", subtitle: "Plan, billing & usage", href: "/organization", icon: "coins", section: "SYSTEM" },
   users: { label: "Users", subtitle: "Accounts & roles", href: "/admin/users", icon: "users", section: "SYSTEM" },
+  auditors: { label: "Auditors", subtitle: "External engagements", href: "/admin/auditors", icon: "search", section: "SYSTEM" },
   audit: { label: "Audit Log", subtitle: "Activity & changes", href: "/audit", icon: "list", section: "SYSTEM" },
 };
 
 // Which nav items each role sees. Executives get a read-only posture view; system owners
 // work on their assigned systems; admins see everything including the audit log.
 export const ROLE_NAV: Record<Role, NavKey[]> = {
-  ADMIN: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "reports", "integrations", "notifications", "organization", "users", "audit"],
-  ATO_SME: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "reports", "integrations", "notifications"],
-  ISSO: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "reports", "integrations", "notifications"],
+  ADMIN: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "vendors", "personnel", "checks", "questionnaires", "reports", "integrations", "trust", "notifications", "organization", "users", "auditors", "audit"],
+  ATO_SME: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "vendors", "personnel", "checks", "questionnaires", "reports", "integrations", "trust", "notifications", "auditors"],
+  ISSO: ["dashboard", "copilot", "systems", "controls", "crosswalks", "cmmc", "evidence", "vulnerabilities", "stig", "poams", "risks", "authorization", "assessor", "ppsm", "policies", "vendors", "personnel", "checks", "questionnaires", "reports", "integrations", "notifications"],
   VULN_ANALYST: ["dashboard", "copilot", "systems", "vulnerabilities", "stig", "poams", "reports", "notifications"],
   SYSTEM_OWNER: ["dashboard", "systems", "evidence", "ppsm", "policies", "authorization", "notifications"],
-  EXECUTIVE: ["dashboard", "risks", "authorization", "policies", "reports", "notifications"],
-  ASSESSOR: ["dashboard", "assessor", "systems", "controls", "evidence", "poams", "risks", "authorization", "reports", "notifications"],
+  EXECUTIVE: ["dashboard", "risks", "authorization", "policies", "vendors", "personnel", "reports", "notifications"],
+  ASSESSOR: ["dashboard", "assessor", "systems", "controls", "evidence", "poams", "risks", "authorization", "vendors", "personnel", "reports", "notifications"],
 };
 
 // Coarse-grained permissions. `action` is "read" or "write"; `entity` is the resource family.
@@ -74,6 +86,7 @@ export type Entity =
   | "system"
   | "control"
   | "evidence"
+  | "evidenceApproval"
   | "rmf"
   | "poam"
   | "vuln"
@@ -86,12 +99,18 @@ export type Entity =
   | "ai"
   | "assessment"
   | "authorization"
-  | "evidenceRequest";
+  | "evidenceRequest"
+  | "vendor"
+  | "personnel"
+  | "check"
+  | "trustcenter"
+  | "questionnaire"
+  | "auditEngagement";
 
 const WRITE_MATRIX: Record<Role, Entity[]> = {
-  ADMIN: ["system", "control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "audit", "ai", "assessment", "authorization", "evidenceRequest"],
-  ATO_SME: ["system", "control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "ai", "assessment", "authorization", "evidenceRequest"],
-  ISSO: ["control", "evidence", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "ai", "assessment", "evidenceRequest"],
+  ADMIN: ["system", "control", "evidence", "evidenceApproval", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "audit", "ai", "assessment", "authorization", "evidenceRequest", "vendor", "personnel", "check", "trustcenter", "questionnaire", "auditEngagement"],
+  ATO_SME: ["system", "control", "evidence", "evidenceApproval", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "ai", "assessment", "authorization", "evidenceRequest", "vendor", "personnel", "check", "trustcenter", "questionnaire", "auditEngagement"],
+  ISSO: ["control", "evidence", "evidenceApproval", "rmf", "poam", "vuln", "risk", "stig", "ppsm", "policy", "integration", "ai", "assessment", "evidenceRequest", "vendor", "personnel", "check", "questionnaire"],
   VULN_ANALYST: ["poam", "vuln", "stig", "ai"],
   SYSTEM_OWNER: ["evidence", "ppsm"],
   EXECUTIVE: [],
@@ -104,9 +123,9 @@ const READ_MATRIX: Record<Role, Entity[] | "all"> = {
   ATO_SME: "all",
   ISSO: "all",
   VULN_ANALYST: ["system", "control", "poam", "vuln", "stig", "ai"],
-  SYSTEM_OWNER: ["system", "control", "evidence", "rmf", "poam", "ppsm", "policy", "assessment", "authorization"],
-  EXECUTIVE: ["system", "control", "poam", "rmf", "vuln", "risk", "policy", "assessment", "authorization"],
-  ASSESSOR: ["system", "control", "evidence", "rmf", "poam", "risk", "stig", "ppsm", "policy", "assessment", "authorization", "evidenceRequest"],
+  SYSTEM_OWNER: ["system", "control", "evidence", "rmf", "poam", "ppsm", "policy", "assessment", "authorization", "questionnaire"],
+  EXECUTIVE: ["system", "control", "poam", "rmf", "vuln", "risk", "policy", "assessment", "authorization", "vendor", "personnel", "check"],
+  ASSESSOR: ["system", "control", "evidence", "rmf", "poam", "risk", "stig", "ppsm", "policy", "assessment", "authorization", "evidenceRequest", "vendor", "personnel", "check"],
 };
 
 export function can(role: Role, action: Action, entity: Entity): boolean {

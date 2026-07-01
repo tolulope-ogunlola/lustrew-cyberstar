@@ -20,6 +20,7 @@ datasource db {
 model Organization {
   id           String   @id @default(cuid())
   name         String
+  slug         String?  @unique // tenant-addressable public Trust Center path: /trust/[slug]
   plan         String   @default("FREE") // FREE | PRO | MSP | ENTERPRISE
   billingEmail String   @default("")
   createdAt    DateTime @default(now())
@@ -28,6 +29,13 @@ model Organization {
   systems      System[]
   policies     Policy[]
   integrations Integration[]
+  vendors         Vendor[]
+  personnel       Personnel[]
+  trainingCourses TrainingCourse[]
+  trustCenter     TrustCenter?
+  answerLibrary   AnswerLibraryEntry[]
+  questionnaires  Questionnaire[]
+  auditEngagements AuditEngagement[]
 }
 
 model User {
@@ -37,6 +45,7 @@ model User {
   passwordHash String
   role         String // ADMIN | ATO_SME | ISSO | VULN_ANALYST | SYSTEM_OWNER | EXECUTIVE
   isActive     Boolean  @default(true)
+  isExternal   Boolean  @default(false) // external auditor — access is scoped via AuditEngagement
   mustChangePassword Boolean @default(false)
   mfaEnabled   Boolean  @default(false)
   mfaSecret    String? // base32 TOTP secret (set during enrollment)
@@ -53,9 +62,14 @@ model User {
   ownedPoams       Poam[]                  @relation("PoamOwner")
   ownedRisks       Risk[]                  @relation("RiskOwner")
   uploadedEvidence Evidence[]              @relation("EvidenceUploader")
+  reviewedEvidence Evidence[]              @relation("EvidenceReviewer")
   signedAuthorizations AuthorizationDecision[] @relation("AuthorizationSigner")
   evidenceRequests EvidenceRequest[]      @relation("EvidenceRequester")
   auditEvents      AuditEvent[]
+  ownedVendors     Vendor[]               @relation("VendorOwner")
+  vendorReviews    VendorReview[]         @relation("VendorReviewer")
+  personnelRecord  Personnel?             @relation("PersonnelUser")
+  engagements      AuditEngagement[]      @relation("EngagementAuditor")
 
   @@index([orgId])
 }
@@ -92,6 +106,8 @@ model System {
   authorizations  AuthorizationDecision[]
   assets          Asset[]
   evidenceRequests EvidenceRequest[]
+  checkAssignments CheckAssignment[]
+  engagements      AuditEngagement[] @relation("EngagementSystem")
 
   @@index([orgId])
 }
@@ -102,16 +118,40 @@ model System {
 
 model Control {
   id        String @id @default(cuid())
-  controlId String @unique // e.g. "AC-2" (800-53) or "3.1.1" (800-171)
+  // A control code is unique WITHIN a framework, not globally — ISO 27001 and ISO 42001 both use
+  // "A.5.2", etc. Uniqueness is enforced by the composite key below.
+  controlId String // e.g. "AC-2" (800-53) or "3.1.1" (800-171) or "CC6.1" (SOC 2)
   family    String // e.g. "AC" or "3.1"
   title     String
   text      String
   baseline  String @default("MODERATE") // LOW | MODERATE | HIGH
-  framework String @default("NIST_800_53") // NIST_800_53 | NIST_800_171
+  framework String @default("NIST_800_53") // NIST_800_53 | NIST_800_171 | SOC2 | ISO_27001 | HIPAA | ISO_42001
 
   implementations ControlImplementation[]
 
+  @@unique([framework, controlId])
   @@index([family])
+  @@index([framework])
+}
+
+// Catalog-level: the evidence a given control/requirement expects (Vanta-style "each control maps
+// to required evidence"). Keyed by controlId STRING (not FK) so one spec can be shared across
+// catalogs that reuse a code and so it survives catalog re-seeds.
+model EvidenceRequirement {
+  id           String  @id @default(cuid())
+  framework    String // SOC2 | ISO_27001 | HIPAA | ISO_42001 | NIST_800_53 | NIST_800_171
+  controlId    String // e.g. "CC6.1", "A.8.5", "164.312(a)(1)", "AC-2"
+  key          String // stable slug within control, e.g. "mfa-config-screenshot"
+  title        String
+  description  String  @default("")
+  evidenceType String  @default("Document") // mirrors Evidence.type vocabulary
+  cadence      String  @default("ANNUAL") // ONE_TIME | QUARTERLY | ANNUAL | CONTINUOUS
+  automatable  Boolean @default(false) // true => a CCM Check can satisfy it
+  checkKey     String? // links to Check.key when automatable (Phase D)
+
+  @@unique([framework, controlId, key])
+  @@index([framework])
+  @@index([controlId])
 }
 
 model ControlImplementation {
@@ -152,16 +192,42 @@ model Evidence {
   fileName    String?
   fileSize    Int?
   contentType String?
+  // Freshness + approval lifecycle (Vanta-style).
+  approvalStatus String   @default("DRAFT") // DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED | EXPIRED
+  validUntil     DateTime? // explicit expiration date
+  cadenceDays    Int       @default(0) // freshness/collection cadence in days; 0 = no recollection expected
+  collectedAt    DateTime? // when the artifact was actually gathered (basis for cadence math)
+  reviewedAt     DateTime?
+  reviewNote     String    @default("")
   createdAt   DateTime @default(now())
 
   systemId     String
   system       System @relation(fields: [systemId], references: [id], onDelete: Cascade)
   uploadedById String?
   uploadedBy   User?  @relation("EvidenceUploader", fields: [uploadedById], references: [id])
+  reviewerId   String?
+  reviewer     User?  @relation("EvidenceReviewer", fields: [reviewerId], references: [id])
 
-  links EvidenceLink[]
+  links         EvidenceLink[]
+  statusHistory EvidenceStatusHistory[]
+  vendorDocuments      VendorDocument[]     @relation("VendorEvidence")
+  trainingCertificates TrainingAssignment[] @relation("TrainingCert")
 
   @@index([systemId])
+}
+
+// Append-only: rows are never updated or deleted (mirrors PoamStatusHistory).
+model EvidenceStatusHistory {
+  id        String   @id @default(cuid())
+  status    String
+  note      String   @default("")
+  changedBy String? // user id; null for system-generated transitions (e.g. auto-expire)
+  createdAt DateTime @default(now())
+
+  evidenceId String
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([evidenceId])
 }
 
 model EvidenceLink {
@@ -449,6 +515,9 @@ model MetricSnapshot {
   posturePercent          Int      @default(0)
   rmfProgressPercent      Int      @default(0)
   evidenceCompletePercent Int      @default(0)
+  evidenceFreshPercent    Int      @default(0)
+  checksPassing           Int      @default(0)
+  checksFailing           Int      @default(0)
   openPoams               Int      @default(0)
   overduePoams            Int      @default(0)
   openVulnCritical        Int      @default(0)
@@ -469,7 +538,7 @@ model MetricSnapshot {
 
 model Integration {
   id         String    @id @default(cuid())
-  type       String // TENABLE | QUALYS | SERVICENOW | SHAREPOINT | EMASS
+  type       String // TENABLE | QUALYS | SERVICENOW | SHAREPOINT | EMASS | GITHUB | M365 | GOOGLE_WS | AWS | OCI
   name       String
   enabled    Boolean   @default(true)
   config     String    @default("{}") // JSON: { mock, baseUrl, accessKey, secretKey, ... } (encrypt at rest in prod)
@@ -494,7 +563,7 @@ model Notification {
   orgId      String
   systemId   String?
   systemName String?
-  category   String // POAM_OVERDUE | RMF_OVERDUE | VULN_OPEN | RISK_OPEN | RISK_ACCEPT_EXPIRING | EVIDENCE_MISSING
+  category   String // POAM_OVERDUE | RMF_OVERDUE | VULN_OPEN | RISK_OPEN | RISK_ACCEPT_EXPIRING | EVIDENCE_MISSING | EVIDENCE_EXPIRED | EVIDENCE_EXPIRING | EVIDENCE_REVIEW_PENDING | VENDOR_REVIEW_DUE | VENDOR_DPA_EXPIRING | VENDOR_DOC_EXPIRING | TRAINING_OVERDUE | ACCESS_REVIEW_OVERDUE | ONBOARDING_TASK_OVERDUE | CHECK_FAILED
   severity   String   @default("WARNING") // INFO | WARNING | CRITICAL
   title      String
   body       String   @default("")
@@ -618,4 +687,454 @@ model AuthorizationDecision {
   signedBy   User?   @relation("AuthorizationSigner", fields: [signedById], references: [id])
 
   @@index([systemId])
+}
+
+// ---------------------------------------------------------------------------
+// Vendor / third-party risk management (org-scoped)
+// ---------------------------------------------------------------------------
+
+model Vendor {
+  id              String    @id @default(cuid())
+  vendorNumber    String // "VEND-0001"
+  name            String
+  businessPurpose String    @default("")
+  dataSensitivity String    @default("NONE") // NONE | PUBLIC | INTERNAL | CONFIDENTIAL | PII | PHI | CUI
+  criticality     String    @default("MODERATE") // LOW | MODERATE | HIGH | CRITICAL
+  status          String    @default("PROSPECTIVE") // PROSPECTIVE | ACTIVE | UNDER_REVIEW | OFFBOARDING | TERMINATED
+  reviewCadence   String    @default("ANNUAL") // NONE | QUARTERLY | SEMIANNUAL | ANNUAL | BIENNIAL
+  riskRating      String    @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  nextReviewDate  DateTime?
+  renewalDate     DateTime?
+  contactName     String    @default("")
+  contactEmail    String    @default("")
+  website         String    @default("")
+  hasDpa          Boolean   @default(false)
+  dpaExpiresAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  orgId   String
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ownerId String?
+  owner   User?        @relation("VendorOwner", fields: [ownerId], references: [id])
+
+  reviews   VendorReview[]
+  documents VendorDocument[]
+
+  @@index([orgId])
+}
+
+model VendorReview {
+  id                      String    @id @default(cuid())
+  reviewType              String    @default("PERIODIC") // ONBOARDING | PERIODIC | INCIDENT | RENEWAL
+  status                  String    @default("NOT_STARTED") // NOT_STARTED | QUESTIONNAIRE_SENT | QUESTIONNAIRE_RECEIVED | IN_REVIEW | COMPLETED | OVERDUE
+  questionnaireSentAt     DateTime?
+  questionnaireReceivedAt DateTime?
+  findings                String    @default("")
+  mitigationPlan          String    @default("")
+  residualRiskRating      String    @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  dueDate                 DateTime?
+  completedAt             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  vendorId   String
+  vendor     Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  reviewerId String?
+  reviewer   User?   @relation("VendorReviewer", fields: [reviewerId], references: [id])
+
+  @@index([vendorId])
+}
+
+model VendorDocument {
+  id         String    @id @default(cuid())
+  docType    String    @default("OTHER") // SOC2_TYPE2 | SOC2_TYPE1 | ISO_27001 | PENTEST | DPA | BAA | CONTRACT | QUESTIONNAIRE | OTHER
+  title      String
+  url        String    @default("")
+  validUntil DateTime?
+  note       String    @default("")
+  createdAt  DateTime  @default(now())
+
+  vendorId   String
+  vendor     Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  evidenceId String?
+  evidence   Evidence? @relation("VendorEvidence", fields: [evidenceId], references: [id], onDelete: SetNull)
+
+  @@index([vendorId])
+}
+
+// ---------------------------------------------------------------------------
+// Personnel compliance (org-scoped; userId optional — contractors aren't app users)
+// ---------------------------------------------------------------------------
+
+model Personnel {
+  id               String    @id @default(cuid())
+  fullName         String
+  email            String    @default("")
+  personnelType    String    @default("EMPLOYEE") // EMPLOYEE | CONTRACTOR | INTERN | SERVICE_ACCOUNT
+  department       String    @default("")
+  jobTitle         String    @default("")
+  status           String    @default("ACTIVE") // ONBOARDING | ACTIVE | OFFBOARDING | OFFBOARDED
+  startDate        DateTime?
+  endDate          DateTime?
+  bgCheckStatus    String    @default("NOT_STARTED") // NOT_STARTED | PENDING | CLEARED | FAILED | EXEMPT
+  bgCheckDate      DateTime?
+  deviceAssignment String    @default("")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId String?      @unique // link to an app user when one exists (MFA + policy acks resolve via this)
+  user   User?        @relation("PersonnelUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  trainingAssignments TrainingAssignment[]
+  accessReviews       AccessReview[]
+  onboardingTasks     OnboardingTask[]
+
+  @@index([orgId])
+}
+
+model TrainingCourse {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  cadenceDays Int      @default(365) // recurrence; 0 = one-time
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  assignments TrainingAssignment[]
+
+  @@index([orgId])
+}
+
+model TrainingAssignment {
+  id                    String    @id @default(cuid())
+  status                String    @default("ASSIGNED") // ASSIGNED | IN_PROGRESS | COMPLETED | OVERDUE | WAIVED
+  assignedAt            DateTime  @default(now())
+  dueDate               DateTime?
+  completedAt           DateTime?
+  score                 Int?
+  certificateEvidenceId String?
+
+  personnelId String
+  personnel   Personnel      @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  certificate Evidence?      @relation("TrainingCert", fields: [certificateEvidenceId], references: [id], onDelete: SetNull)
+
+  @@unique([personnelId, courseId, assignedAt])
+  @@index([personnelId])
+  @@index([courseId])
+}
+
+model AccessReview {
+  id         String    @id @default(cuid())
+  scope      String    @default("") // system/app reviewed
+  status     String    @default("PENDING") // PENDING | IN_PROGRESS | CERTIFIED | REVOKED | OVERDUE
+  decision   String    @default("") // RETAIN | MODIFY | REVOKE (free until decided)
+  dueDate    DateTime?
+  reviewedAt DateTime?
+  reviewerId String?
+  notes      String    @default("")
+  createdAt  DateTime  @default(now())
+
+  personnelId String
+  personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+
+  @@index([personnelId])
+}
+
+model OnboardingTask {
+  id          String    @id @default(cuid())
+  phase       String    @default("ONBOARDING") // ONBOARDING | OFFBOARDING
+  title       String
+  done        Boolean   @default(false)
+  dueDate     DateTime?
+  completedAt DateTime?
+  sortOrder   Int       @default(0)
+
+  personnelId String
+  personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+
+  @@index([personnelId])
+}
+
+// ---------------------------------------------------------------------------
+// Continuous Controls Monitoring (CCM) — automated tests against external systems
+// ---------------------------------------------------------------------------
+
+// A test definition (catalog-global; seeded). Org binding happens via CheckAssignment.
+model Check {
+  id               String  @id @default(cuid())
+  key              String  @unique // stable slug, e.g. "mfa-all-users"
+  title            String
+  description      String  @default("")
+  category         String  @default("IDENTITY") // IDENTITY | INFRA | CODE | LOGGING | ENCRYPTION | ACCESS
+  providerType     String // matches Integration.type: GITHUB | M365 | GOOGLE_WS | AWS | OCI
+  probe            String // connector method name, e.g. "listUsersMfaStatus"
+  severity         String  @default("HIGH") // INFO | LOW | MODERATE | HIGH | CRITICAL
+  frequency        String  @default("DAILY") // HOURLY | DAILY | WEEKLY
+  mappedControls   String  @default("[]") // JSON: [{framework, controlId}]
+  remediation      String  @default("")
+  evidenceType     String  @default("Config")
+  enabledByDefault Boolean @default(true)
+
+  assignments CheckAssignment[]
+
+  @@index([providerType])
+}
+
+// Binds a Check to a System + the Integration that runs it. One row per (system, check).
+model CheckAssignment {
+  id            String   @id @default(cuid())
+  orgId         String
+  systemId      String
+  checkId       String
+  integrationId String? // which connector executes the probe
+  enabled       Boolean  @default(true)
+  paramsJson    String   @default("{}") // per-assignment thresholds, e.g. { maxAdmins: 4 }
+  createdAt     DateTime @default(now())
+
+  check   Check         @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  system  System        @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  results CheckResult[]
+
+  @@unique([systemId, checkId])
+  @@index([orgId])
+  @@index([systemId])
+}
+
+// History of every run. Newest row per assignment is the current state; older rows are the trail.
+model CheckResult {
+  id            String   @id @default(cuid())
+  orgId         String
+  systemId      String
+  assignmentId  String
+  status        String // PASS | FAIL | ERROR
+  details       String   @default("")
+  evidenceJson  String   @default("{}") // raw probe output (the auto-evidence payload)
+  resourceCount Int      @default(0)
+  failingCount  Int      @default(0)
+  dedupeKey     String // stable per (systemId, checkKey)
+  evidenceId    String? // Evidence row generated this run
+  poamId        String? // POA&M opened on failure (if any)
+  checkedAt     DateTime @default(now())
+
+  assignment CheckAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([systemId, checkedAt])
+  @@index([assignmentId, checkedAt])
+  @@index([orgId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Trust Center (public security profile + NDA-gated document sharing)
+// ---------------------------------------------------------------------------
+
+model TrustCenter {
+  id            String  @id @default(cuid())
+  orgId         String  @unique
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  published     Boolean @default(false)
+  companyName   String  @default("")
+  headline      String  @default("")
+  overview      String  @default("") // security-commitments narrative (markdown text)
+  frameworks    String  @default("[]") // JSON string[] badges: SOC2, ISO_27001, ...
+  subprocessors String  @default("[]") // JSON [{name, purpose, location}]
+  statusUrl     String  @default("")
+  contactEmail  String  @default("")
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  documents      TrustDocument[]
+  accessRequests AccessRequest[]
+
+  @@index([orgId])
+}
+
+model TrustDocument {
+  id            String  @id @default(cuid())
+  trustCenterId String
+  trustCenter   TrustCenter @relation(fields: [trustCenterId], references: [id], onDelete: Cascade)
+  orgId         String // denormalized for isolation checks on public paths
+  title         String
+  category      String  @default("OTHER") // SOC2 | ISO_CERT | PENTEST | POLICY | OTHER
+  visibility    String  @default("GATED") // PUBLIC | GATED
+  // Reuse the Evidence storage pattern — point at an existing artifact OR carry own metadata.
+  evidenceId    String?
+  fileRef       String? // opaque storage key, NEVER a public URL
+  fileName      String?
+  contentType   String?
+  fileSize      Int?
+  requiresNda   Boolean @default(true)
+  active        Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  grants AccessGrant[]
+
+  @@index([trustCenterId])
+  @@index([orgId])
+}
+
+model AccessRequest {
+  id            String  @id @default(cuid())
+  trustCenterId String
+  trustCenter   TrustCenter @relation(fields: [trustCenterId], references: [id], onDelete: Cascade)
+  orgId         String
+  email         String
+  name          String  @default("")
+  company       String  @default("")
+  reason        String  @default("")
+  requestedDocs String  @default("[]") // JSON TrustDocument id[]
+  status        String  @default("PENDING") // PENDING | APPROVED | DENIED | EXPIRED
+  decidedById   String?
+  decidedAt     DateTime?
+  ipHash        String  @default("")
+  createdAt     DateTime @default(now())
+
+  nda    NdaAcceptance?
+  grants AccessGrant[]
+
+  @@index([trustCenterId])
+  @@index([orgId, status])
+  @@index([email])
+}
+
+model NdaAcceptance {
+  id              String @id @default(cuid())
+  accessRequestId String @unique
+  accessRequest   AccessRequest @relation(fields: [accessRequestId], references: [id], onDelete: Cascade)
+  ndaVersion      String
+  ndaTextHash     String
+  acceptedName    String
+  acceptedEmail   String
+  ipHash          String @default("")
+  userAgent       String @default("")
+  acceptedAt      DateTime @default(now())
+}
+
+model AccessGrant {
+  id              String @id @default(cuid())
+  accessRequestId String
+  accessRequest   AccessRequest @relation(fields: [accessRequestId], references: [id], onDelete: Cascade)
+  documentId      String
+  document        TrustDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  orgId           String
+  tokenHash       String   @unique // sha256 of the opaque token (raw token only ever emailed)
+  email           String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  maxDownloads    Int      @default(20)
+  downloadCount   Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  logs AccessLog[]
+
+  @@index([orgId])
+  @@index([documentId])
+}
+
+model AccessLog {
+  id         String @id @default(cuid())
+  grantId    String?
+  grant      AccessGrant? @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  orgId      String
+  documentId String?
+  email      String @default("")
+  event      String // VIEW | DOWNLOAD | DENIED | TOKEN_EXPIRED
+  ipHash     String @default("")
+  userAgent  String @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([orgId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Security questionnaire automation
+// ---------------------------------------------------------------------------
+
+model AnswerLibraryEntry {
+  id             String  @id @default(cuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  question       String
+  answer         String
+  category       String  @default("General")
+  tags           String  @default("[]") // JSON string[]
+  sourceRefs     String  @default("[]") // JSON [{type, id, label}]
+  status         String  @default("APPROVED") // DRAFT | APPROVED | RETIRED
+  lastReviewedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, category])
+}
+
+model Questionnaire {
+  id          String  @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  customer    String  @default("")
+  status      String  @default("DRAFT") // DRAFT | DRAFTING | IN_REVIEW | APPROVED | EXPORTED
+  sourceFile  String  @default("")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items QuestionnaireItem[]
+
+  @@index([orgId])
+}
+
+model QuestionnaireItem {
+  id              String  @id @default(cuid())
+  questionnaireId String
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  rowIndex        Int
+  section         String  @default("")
+  question        String
+  draftAnswer     String  @default("")
+  approvedAnswer  String  @default("")
+  status          String  @default("PENDING") // PENDING | DRAFTED | APPROVED | NEEDS_INPUT
+  confidence      Float   @default(0)
+  source          String  @default("") // LIBRARY | AI | MANUAL
+  sourceRefs      String  @default("[]")
+  libraryEntryId  String?
+  updatedAt       DateTime @updatedAt
+
+  @@unique([questionnaireId, rowIndex])
+  @@index([questionnaireId])
+}
+
+// ---------------------------------------------------------------------------
+// External auditor portal — scoped, time-boxed read access to a single system
+// ---------------------------------------------------------------------------
+
+model AuditEngagement {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  systemId    String // SINGLE system in scope
+  system      System   @relation("EngagementSystem", fields: [systemId], references: [id], onDelete: Cascade)
+  auditorId   String // external User (role ASSESSOR, isExternal = true)
+  auditor     User     @relation("EngagementAuditor", fields: [auditorId], references: [id])
+  invitedById String?
+  title       String   @default("")
+  status      String   @default("PENDING") // PENDING | ACTIVE | EXPIRED | REVOKED
+  scopes      String   @default("[]") // JSON: ["controls","evidence","policies","poams","risks","audit"]
+  startsAt    DateTime @default(now())
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([systemId, auditorId])
+  @@index([orgId])
+  @@index([auditorId])
 }

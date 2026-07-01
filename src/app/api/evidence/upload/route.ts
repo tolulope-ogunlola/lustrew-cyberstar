@@ -7,6 +7,7 @@ import {
   storage,
 } from "@/lib/storage";
 import { contentMatchesType, scanBuffer } from "@/lib/av";
+import { computeValidUntil } from "@/lib/evidence";
 
 // POST multipart/form-data: systemId, title, type?, note?, implementationIds? (JSON array), file
 export async function POST(req: Request) {
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
     const title = String(form.get("title") || "").trim();
     const type = String(form.get("type") || "Document");
     const note = String(form.get("note") || "");
+    const cadenceDays = Math.max(0, Math.min(3650, parseInt(String(form.get("cadenceDays") || "0"), 10) || 0));
     const file = form.get("file");
 
     if (!systemId) throw new HttpError(400, "systemId is required");
@@ -75,6 +77,7 @@ export async function POST(req: Request) {
       bytes,
     });
 
+    const collectedAt = new Date();
     const evidence = await prisma.evidence.create({
       data: {
         systemId,
@@ -85,7 +88,11 @@ export async function POST(req: Request) {
         fileName: file.name,
         fileSize: stored.size,
         contentType,
+        cadenceDays,
+        collectedAt,
+        validUntil: computeValidUntil(collectedAt, cadenceDays),
         uploadedById: user.id,
+        statusHistory: { create: { status: "DRAFT", note: "Evidence uploaded.", changedBy: user.id } },
         links: { create: implementationIds.map((implementationId) => ({ implementationId })) },
       },
     });

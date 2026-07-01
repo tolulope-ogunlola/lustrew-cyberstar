@@ -64,6 +64,13 @@ const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-slate-500/15 text-slate-300",
   UNDER_REVIEW: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   EXPIRED: "bg-red-500/15 text-red-700 dark:text-red-300",
+  // Evidence approval workflow
+  SUBMITTED: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  REJECTED: "bg-red-500/15 text-red-700 dark:text-red-300",
+  // CCM check results
+  PASS: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  FAIL: "bg-red-500/15 text-red-700 dark:text-red-300",
+  ERROR: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 };
 
 export function StatusBadge({ value }: { value: string }) {

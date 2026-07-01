@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { HttpError, requireUser, route } from "@/lib/api";
+import { HttpError, requireUser, route, requireSystemAccess } from "@/lib/api";
 import { computeScore, type ImplForScore } from "@/lib/scoring";
 import { parseFrameworks } from "@/lib/util";
 import { isOpenRisk, score as riskScore } from "@/lib/risk";
@@ -12,6 +12,7 @@ export async function GET(
   return route(async () => {
     const user = await requireUser();
     const { systemId } = await params;
+    await requireSystemAccess(user, systemId);
 
     const system = await prisma.system.findFirst({
       where: { id: systemId, orgId: user.orgId },

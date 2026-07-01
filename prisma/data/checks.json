@@ -1,0 +1,107 @@
+[
+  {
+    "key": "mfa-all-users", "title": "MFA enforced for all users", "category": "IDENTITY",
+    "providerType": "M365", "probe": "listUsersMfaStatus", "severity": "HIGH", "frequency": "DAILY",
+    "remediation": "Require multi-factor authentication for every user via a conditional access policy.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"IA-2"},{"framework":"NIST_800_171","controlId":"3.5.3"},{"framework":"SOC2","controlId":"CC6.1"},{"framework":"ISO_27001","controlId":"A.8.5"},{"framework":"HIPAA","controlId":"164.312(d)"}]
+  },
+  {
+    "key": "admin-count-max", "title": "Administrator count within threshold", "category": "ACCESS",
+    "providerType": "M365", "probe": "listAdmins", "severity": "MODERATE", "frequency": "DAILY",
+    "remediation": "Reduce the number of privileged/global administrators to the minimum necessary.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"AC-6"},{"framework":"SOC2","controlId":"CC6.3"},{"framework":"ISO_27001","controlId":"A.8.2"}]
+  },
+  {
+    "key": "inactive-users-disabled", "title": "Inactive accounts disabled", "category": "IDENTITY",
+    "providerType": "M365", "probe": "listInactiveUsers", "severity": "MODERATE", "frequency": "WEEKLY",
+    "remediation": "Disable accounts that have been inactive beyond the org-defined threshold.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"AC-2"},{"framework":"SOC2","controlId":"CC6.1"},{"framework":"ISO_27001","controlId":"A.5.18"}]
+  },
+  {
+    "key": "audit-logging-enabled", "title": "Audit logging enabled", "category": "LOGGING",
+    "providerType": "M365", "probe": "auditLoggingEnabled", "severity": "HIGH", "frequency": "DAILY",
+    "remediation": "Enable unified/directory audit logging and forward to centralized storage.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"AU-2"},{"framework":"SOC2","controlId":"CC7.2"},{"framework":"ISO_27001","controlId":"A.8.15"}]
+  },
+  {
+    "key": "github-branch-protection", "title": "GitHub default branch protection", "category": "CODE",
+    "providerType": "GITHUB", "probe": "listRepoBranchProtection", "severity": "HIGH", "frequency": "DAILY",
+    "remediation": "Enable branch protection with required reviews on every active repository's default branch.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"CM-2"},{"framework":"SOC2","controlId":"CC8.1"},{"framework":"ISO_27001","controlId":"A.8.32"}]
+  },
+  {
+    "key": "github-2fa-org", "title": "GitHub org 2FA required", "category": "IDENTITY",
+    "providerType": "GITHUB", "probe": "listUsersMfaStatus", "severity": "HIGH", "frequency": "DAILY",
+    "remediation": "Require two-factor authentication for all GitHub organization members.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"IA-2"},{"framework":"SOC2","controlId":"CC6.1"}]
+  },
+  {
+    "key": "github-admin-count", "title": "GitHub org admins within threshold", "category": "ACCESS",
+    "providerType": "GITHUB", "probe": "listOrgAdmins", "severity": "MODERATE", "frequency": "WEEKLY",
+    "remediation": "Limit GitHub organization owners to the minimum necessary.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"AC-6"},{"framework":"SOC2","controlId":"CC6.3"}]
+  },
+  {
+    "key": "no-public-buckets", "title": "No publicly accessible storage", "category": "INFRA",
+    "providerType": "AWS", "probe": "listPublicBuckets", "severity": "CRITICAL", "frequency": "DAILY",
+    "remediation": "Remove public access from object-storage buckets; enable account-level public access block.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"SC-7"},{"framework":"SOC2","controlId":"CC6.6"},{"framework":"ISO_27001","controlId":"A.8.20"},{"framework":"HIPAA","controlId":"164.312(a)(1)"}]
+  },
+  {
+    "key": "encryption-at-rest", "title": "Encryption at rest enabled", "category": "ENCRYPTION",
+    "providerType": "AWS", "probe": "ebsEncryptionEnabled", "severity": "HIGH", "frequency": "DAILY",
+    "remediation": "Enable default encryption for volumes, databases, and object storage.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"SC-8"},{"framework":"NIST_800_171","controlId":"3.13.16"},{"framework":"SOC2","controlId":"CC6.7"},{"framework":"ISO_27001","controlId":"A.8.24"},{"framework":"HIPAA","controlId":"164.312(a)(2)(iv)"}]
+  },
+  {
+    "key": "cloud-audit-logging", "title": "Cloud audit trail enabled", "category": "LOGGING",
+    "providerType": "AWS", "probe": "cloudTrailEnabled", "severity": "HIGH", "frequency": "DAILY",
+    "remediation": "Enable a multi-region CloudTrail (or equivalent) logging to a protected bucket.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"AU-12"},{"framework":"SOC2","controlId":"CC7.2"},{"framework":"ISO_27001","controlId":"A.8.15"}]
+  },
+  {
+    "key": "root-mfa", "title": "MFA on root and IAM users", "category": "IDENTITY",
+    "providerType": "AWS", "probe": "mfaOnRootAndUsers", "severity": "CRITICAL", "frequency": "DAILY",
+    "remediation": "Enable MFA on the root account and all IAM users with console access.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"IA-2"},{"framework":"SOC2","controlId":"CC6.1"}]
+  },
+  {
+    "key": "iam-admin-count", "title": "IAM admins within threshold", "category": "ACCESS",
+    "providerType": "AWS", "probe": "listIamAdmins", "severity": "MODERATE", "frequency": "WEEKLY",
+    "remediation": "Reduce IAM principals with administrative policies to the minimum necessary.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"AC-6"},{"framework":"SOC2","controlId":"CC6.3"}]
+  },
+  {
+    "key": "tls-in-transit", "title": "TLS enforced in transit", "category": "ENCRYPTION",
+    "providerType": "AWS", "probe": "tlsInTransit", "severity": "HIGH", "frequency": "DAILY",
+    "remediation": "Enforce TLS 1.2+ on load balancers and deny insecure transport on buckets.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"SC-8"},{"framework":"SOC2","controlId":"CC6.7"},{"framework":"ISO_27001","controlId":"A.8.24"},{"framework":"HIPAA","controlId":"164.312(e)(1)"}]
+  },
+  {
+    "key": "google-2sv", "title": "Google 2-Step Verification enforced", "category": "IDENTITY",
+    "providerType": "GOOGLE_WS", "probe": "listUsersMfaStatus", "severity": "HIGH", "frequency": "DAILY",
+    "remediation": "Enforce 2-Step Verification for all Google Workspace users.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"IA-2"},{"framework":"SOC2","controlId":"CC6.1"},{"framework":"ISO_27001","controlId":"A.8.5"}]
+  },
+  {
+    "key": "google-super-admin-count", "title": "Google super-admins within threshold", "category": "ACCESS",
+    "providerType": "GOOGLE_WS", "probe": "listSuperAdmins", "severity": "MODERATE", "frequency": "WEEKLY",
+    "remediation": "Limit Google Workspace super administrators to the minimum necessary.",
+    "evidenceType": "Config",
+    "mappedControls": [{"framework":"NIST_800_53","controlId":"AC-6"},{"framework":"SOC2","controlId":"CC6.3"},{"framework":"ISO_27001","controlId":"A.8.2"}]
+  }
+]

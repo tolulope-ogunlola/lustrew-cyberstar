@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { HttpError, requireUser, route } from "@/lib/api";
+import { HttpError, requireUser, route, requireSystemAccess } from "@/lib/api";
 
 /**
  * GET /api/controls            -> global NIST 800-53 catalog
@@ -14,6 +14,7 @@ export async function GET(req: Request) {
       return prisma.control.findMany({ orderBy: { controlId: "asc" } });
     }
 
+    await requireSystemAccess(user, systemId, "controls");
     const system = await prisma.system.findFirst({
       where: { id: systemId, orgId: user.orgId },
       select: { id: true },

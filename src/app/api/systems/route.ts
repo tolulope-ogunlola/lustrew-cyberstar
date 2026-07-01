@@ -1,16 +1,18 @@
 import { prisma } from "@/lib/db";
-import { HttpError, requireUser, requirePermission, route } from "@/lib/api";
+import { HttpError, requireUser, requirePermission, route, scopedSystemIds } from "@/lib/api";
 import { writeAuditEvent } from "@/lib/audit";
 import { systemCreateSchema } from "@/lib/validation";
 import { serializeFrameworks, withFrameworks } from "@/lib/util";
 import { requirementsForLevel } from "@/lib/cmmc";
+import { catalogsForFrameworks } from "@/lib/frameworks";
 import { canAddSystem, getPlan } from "@/lib/plans";
 
 export async function GET() {
   return route(async () => {
     const user = await requireUser();
+    const scoped = await scopedSystemIds(user); // external auditors see only engagement systems
     const systems = await prisma.system.findMany({
-      where: { orgId: user.orgId },
+      where: { orgId: user.orgId, ...(scoped ? { id: { in: scoped } } : {}) },
       orderBy: { createdAt: "asc" },
       include: {
         owner: { select: { name: true } },
@@ -44,11 +46,10 @@ export async function POST(req: Request) {
     });
 
     // Spin up an implementation row per applicable catalog control (scoped to the system's
-    // frameworks), plus the seven RMF steps. A system can carry 800-53 and/or 800-171 controls.
+    // frameworks), plus the seven RMF steps. A system can carry NIST 800-53, NIST 800-171, and/or
+    // commercial catalogs (SOC 2, ISO 27001, HIPAA, ISO 42001).
     const fw = body.frameworks;
-    const wants171 = fw.some((f) => f === "CMMC_L1" || f === "CMMC_L2" || f === "NIST_800_171");
-    const wants53 = fw.some((f) => !["CMMC_L1", "CMMC_L2", "NIST_800_171"].includes(f)) || !wants171;
-    const l1Only = wants171 && fw.includes("CMMC_L1") && !fw.includes("CMMC_L2") && !fw.includes("NIST_800_171");
+    const { wants53, wants171, l1Only, commercial } = catalogsForFrameworks(fw);
 
     const controlIds: string[] = [];
     if (wants53) {
@@ -59,6 +60,10 @@ export async function POST(req: Request) {
       const c171 = await prisma.control.findMany({ where: { framework: "NIST_800_171" }, orderBy: { controlId: "asc" }, select: { id: true, controlId: true } });
       const keep = l1Only ? new Set(requirementsForLevel("CMMC_L1", c171.map((c) => c.controlId))) : null;
       controlIds.push(...c171.filter((c) => (keep ? keep.has(c.controlId) : true)).map((c) => c.id));
+    }
+    if (commercial.length) {
+      const cc = await prisma.control.findMany({ where: { framework: { in: commercial } }, select: { id: true } });
+      controlIds.push(...cc.map((c) => c.id));
     }
     if (controlIds.length) {
       await prisma.controlImplementation.createMany({

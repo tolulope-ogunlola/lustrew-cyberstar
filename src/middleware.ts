@@ -15,6 +15,10 @@ const PROTECTED = [
   "/risks",
   "/ppsm",
   "/policies",
+  "/vendors",
+  "/personnel",
+  "/checks",
+  "/questionnaires",
   "/reports",
   "/integrations",
   "/notifications",
@@ -22,7 +26,15 @@ const PROTECTED = [
   "/account",
   "/admin",
   "/audit",
+  "/auditor",
 ];
+
+// External auditors are confined to the auditor portal (+ their own account page).
+const EXTERNAL_ALLOWED = ["/auditor", "/account"];
+
+// Public Trust Center profiles live at /trust/[slug]; only the admin page at exactly "/trust" is
+// gated. These prefixes are served without auth (the public default), so they are checked first.
+const PUBLIC_PREFIXES = ["/trust/"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -43,13 +55,24 @@ export async function middleware(req: NextRequest) {
     `frame-ancestors 'none'`,
   ].join("; ");
 
-  // Auth gate for protected page paths.
-  if (PROTECTED.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+  // Auth gate for protected page paths. Public Trust Center profiles (/trust/<slug>) are exempt;
+  // the admin page at exactly "/trust" still requires auth (handled by the "/trust" prefix below).
+  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+  const isProtected =
+    !isPublic && (pathname === "/trust" || PROTECTED.some((p) => pathname === p || pathname.startsWith(p + "/")));
+  if (isProtected) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     if (!token) {
       const url = req.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(url);
+    }
+    // External auditors may only reach the auditor portal + their account page.
+    if (token.isExternal && !EXTERNAL_ALLOWED.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/auditor";
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }

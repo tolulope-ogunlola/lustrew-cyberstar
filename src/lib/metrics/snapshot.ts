@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { computeScore, type ImplForScore } from "@/lib/scoring";
 import { isOpenRisk, score as riskScore } from "@/lib/risk";
+import { freshnessSummary } from "@/lib/evidence";
 
 // Capture a daily posture snapshot per system so the dashboard can chart trends over time.
 // Idempotent per (system, day) — safe to run repeatedly (e.g. from the notifications cron).
@@ -9,7 +10,7 @@ export async function recordSnapshots(orgId: string): Promise<number> {
   const day = new Date().toISOString().slice(0, 10);
 
   for (const sys of systems) {
-    const [impls, steps, poams, openVulns, risks] = await Promise.all([
+    const [impls, steps, poams, openVulns, risks, evidence, checkAssignments] = await Promise.all([
       prisma.controlImplementation.findMany({
         where: { systemId: sys.id },
         select: { status: true, scoping: true, narrative: true, _count: { select: { evidenceLinks: true } } },
@@ -18,7 +19,16 @@ export async function recordSnapshots(orgId: string): Promise<number> {
       prisma.poam.findMany({ where: { systemId: sys.id }, select: { status: true, scheduledCompletion: true, actualCompletion: true } }),
       prisma.vulnerability.findMany({ where: { systemId: sys.id, state: "OPEN" }, select: { severity: true } }),
       prisma.risk.findMany({ where: { systemId: sys.id }, select: { status: true, likelihood: true, impact: true } }),
+      prisma.evidence.findMany({ where: { systemId: sys.id }, select: { approvalStatus: true, validUntil: true, cadenceDays: true, collectedAt: true } }),
+      prisma.checkAssignment.findMany({
+        where: { systemId: sys.id, enabled: true },
+        select: { results: { orderBy: { checkedAt: "desc" }, take: 1, select: { status: true } } },
+      }),
     ]);
+
+    const latestChecks = checkAssignments.map((a) => a.results[0]?.status).filter(Boolean);
+    const checksPassing = latestChecks.filter((s) => s === "PASS").length;
+    const checksFailing = latestChecks.filter((s) => s === "FAIL").length;
 
     const forScore: ImplForScore[] = impls.map((i) => ({
       status: i.status,
@@ -35,6 +45,9 @@ export async function recordSnapshots(orgId: string): Promise<number> {
       posturePercent: score.posturePercent,
       rmfProgressPercent: score.rmfProgressPercent,
       evidenceCompletePercent: score.evidenceCompletePercent,
+      evidenceFreshPercent: freshnessSummary(evidence).freshPercent,
+      checksPassing,
+      checksFailing,
       openPoams: score.openPoams,
       overduePoams: score.overduePoams,
       openVulnCritical: openVulns.filter((v) => v.severity === "CRITICAL").length,

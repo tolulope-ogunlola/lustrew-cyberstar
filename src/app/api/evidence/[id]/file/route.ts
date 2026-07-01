@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
+import { scopedSystemIds } from "@/lib/api";
 import { storage } from "@/lib/storage";
 
-// Authenticated, org-scoped download. Files are never served from a public directory.
+// Authenticated, org-scoped download. Files are never served from a public directory. External
+// auditors are further confined to evidence belonging to their engagement system(s).
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,9 +15,13 @@ export async function GET(
   const { id } = await params;
   const evidence = await prisma.evidence.findFirst({
     where: { id, system: { orgId: user.orgId } },
-    select: { fileRef: true, fileName: true, contentType: true },
+    select: { fileRef: true, fileName: true, contentType: true, systemId: true },
   });
   if (!evidence?.fileRef) {
+    return new Response(JSON.stringify({ error: "File not found" }), { status: 404 });
+  }
+  const scoped = await scopedSystemIds(user);
+  if (scoped && !scoped.includes(evidence.systemId)) {
     return new Response(JSON.stringify({ error: "File not found" }), { status: 404 });
   }
 

@@ -60,6 +60,8 @@ async function main() {
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
   await prisma.control.deleteMany();
+  await prisma.evidenceRequirement.deleteMany();
+  await prisma.check.deleteMany();
 
   // --- Organization + users ---
   const org = await prisma.organization.create({
@@ -108,6 +110,71 @@ async function main() {
       framework: "NIST_800_171",
     })),
   });
+  // --- Commercial framework catalogs (SOC 2, ISO 27001, HIPAA, ISO 42001) ---
+  const COMMERCIAL_PACKS: { file: string; framework: string }[] = [
+    { file: "soc2-tsc.json", framework: "SOC2" },
+    { file: "iso-27001-2022.json", framework: "ISO_27001" },
+    { file: "hipaa-security-rule.json", framework: "HIPAA" },
+    { file: "iso-42001.json", framework: "ISO_42001" },
+  ];
+  for (const pack of COMMERCIAL_PACKS) {
+    const rows: ControlSeed[] = JSON.parse(readFileSync(join(__dirname, "data", pack.file), "utf8"));
+    await prisma.control.createMany({
+      data: rows.map((c) => ({
+        controlId: c.controlId,
+        family: c.family,
+        title: c.title,
+        text: c.text,
+        baseline: c.baseline,
+        framework: pack.framework,
+      })),
+    });
+  }
+
+  // --- Per-control evidence requirements (Vanta-style "each control maps to required evidence") ---
+  type EvidenceReqSeed = {
+    framework: string;
+    controlId: string;
+    key: string;
+    title: string;
+    description?: string;
+    evidenceType?: string;
+    cadence?: string;
+    automatable?: boolean;
+    checkKey?: string;
+  };
+  const evidenceReqs: EvidenceReqSeed[] = JSON.parse(
+    readFileSync(join(__dirname, "data", "evidence-requirements.json"), "utf8")
+  );
+  await prisma.evidenceRequirement.createMany({
+    data: evidenceReqs.map((r) => ({
+      framework: r.framework,
+      controlId: r.controlId,
+      key: r.key,
+      title: r.title,
+      description: r.description ?? "",
+      evidenceType: r.evidenceType ?? "Document",
+      cadence: r.cadence ?? "ANNUAL",
+      automatable: r.automatable ?? false,
+      checkKey: r.checkKey ?? null,
+    })),
+  });
+
+  // --- CCM check catalog ---
+  type CheckSeed = {
+    key: string; title: string; category: string; providerType: string; probe: string;
+    severity: string; frequency: string; remediation: string; evidenceType: string;
+    mappedControls: { framework: string; controlId: string }[];
+  };
+  const checkSeeds: CheckSeed[] = JSON.parse(readFileSync(join(__dirname, "data", "checks.json"), "utf8"));
+  await prisma.check.createMany({
+    data: checkSeeds.map((c) => ({
+      key: c.key, title: c.title, category: c.category, providerType: c.providerType, probe: c.probe,
+      severity: c.severity, frequency: c.frequency, remediation: c.remediation, evidenceType: c.evidenceType,
+      mappedControls: JSON.stringify(c.mappedControls),
+    })),
+  });
+
   // 800-53 controls drive the RMF/53 demo systems below.
   const allControls = await prisma.control.findMany({ where: { framework: "NIST_800_53" } });
 
@@ -171,6 +238,12 @@ async function main() {
           url: `https://evidence.local/${system.name.replace(/\s+/g, "-").toLowerCase()}/${control.controlId}.pdf`,
           note: "Captured during continuous monitoring cycle.",
           uploadedById: users.ISSO,
+          approvalStatus: "APPROVED",
+          collectedAt: daysFromNow(-30),
+          cadenceDays: 365,
+          validUntil: daysFromNow(335),
+          reviewedAt: daysFromNow(-28),
+          reviewerId: users.ATO_SME,
         },
       });
       await prisma.evidenceLink.create({
@@ -460,6 +533,82 @@ async function main() {
     ],
   });
 
+  // --- Commercial SaaS system pursuing SOC 2 + ISO 27001 ---
+  const aurora = await prisma.system.create({
+    data: {
+      name: "Aurora SaaS",
+      description: "Commercial multi-tenant SaaS pursuing SOC 2 Type II and ISO/IEC 27001 certification.",
+      fipsCategory: "MODERATE",
+      frameworks: JSON.stringify(["SOC2", "ISO_27001"]),
+      orgId: org.id,
+      ownerId: users.SYSTEM_OWNER,
+    },
+  });
+  await prisma.rmfStep.createMany({
+    data: RMF_STEPS.map((s) => ({ systemId: aurora.id, step: s })),
+  });
+  const commercialControls = await prisma.control.findMany({
+    where: { framework: { in: ["SOC2", "ISO_27001"] } },
+    orderBy: { controlId: "asc" },
+  });
+  for (let i = 0; i < commercialControls.length; i++) {
+    const c = commercialControls[i];
+    // Deterministic spread so the fulfillment view shows a realistic mix.
+    const status = statuses[i % statuses.length];
+    const impl = await prisma.controlImplementation.create({
+      data: {
+        systemId: aurora.id,
+        controlId: c.id,
+        status,
+        ownerId: i % 2 === 0 ? users.ISSO : users.SYSTEM_OWNER,
+        narrative:
+          status === "IMPLEMENTED"
+            ? `${c.controlId} is implemented for Aurora SaaS and validated during the most recent review.`
+            : "",
+      },
+    });
+    // Attach evidence to a few implemented controls so "evidence collected" is non-empty.
+    // Alternate approved vs. pending-review so the approval workflow + backlog alerts are visible.
+    if (status === "IMPLEMENTED" && i % 4 === 0) {
+      const pending = i % 8 === 0;
+      const ev = await prisma.evidence.create({
+        data: {
+          systemId: aurora.id,
+          title: `${c.controlId} evidence — ${c.title}`,
+          type: "Document",
+          note: "Collected during SOC 2 / ISO 27001 readiness.",
+          uploadedById: users.ISSO,
+          approvalStatus: pending ? "SUBMITTED" : "APPROVED",
+          collectedAt: daysFromNow(-20),
+          cadenceDays: 365,
+          validUntil: pending ? null : daysFromNow(345),
+          reviewedAt: pending ? null : daysFromNow(-18),
+          reviewerId: pending ? null : users.ATO_SME,
+          statusHistory: {
+            create: { status: pending ? "SUBMITTED" : "APPROVED", note: "Seed.", changedBy: users.ISSO },
+          },
+        },
+      });
+      await prisma.evidenceLink.create({ data: { evidenceId: ev.id, implementationId: impl.id } });
+    }
+  }
+
+  // --- CCM: mock integrations + check assignments on Aurora (visible PASS/FAIL on first run) ---
+  const [ghIntegration, m365Integration, awsIntegration] = await Promise.all([
+    prisma.integration.create({ data: { orgId: org.id, type: "GITHUB", name: "GitHub (demo)", systemId: aurora.id, config: JSON.stringify({ mock: true, org: "lustrew" }) } }),
+    prisma.integration.create({ data: { orgId: org.id, type: "M365", name: "Microsoft 365 (demo)", systemId: aurora.id, config: JSON.stringify({ mock: true }) } }),
+    prisma.integration.create({ data: { orgId: org.id, type: "AWS", name: "AWS (demo)", systemId: aurora.id, config: JSON.stringify({ mock: true }) } }),
+  ]);
+  const integByProvider: Record<string, string> = { GITHUB: ghIntegration.id, M365: m365Integration.id, AWS: awsIntegration.id };
+  const seededChecks = await prisma.check.findMany();
+  for (const c of seededChecks) {
+    const integrationId = integByProvider[c.providerType];
+    if (!integrationId) continue; // only wire GitHub/M365/AWS demo connectors
+    await prisma.checkAssignment.create({
+      data: { orgId: org.id, systemId: aurora.id, checkId: c.id, integrationId, paramsJson: JSON.stringify({ maxAdmins: 5 }) },
+    });
+  }
+
   // Org policy library
   await prisma.policy.createMany({
     data: [
@@ -468,6 +617,112 @@ async function main() {
       { orgId: org.id, title: "Configuration Management Policy", framework: "NIST_800_53", version: "1.0", status: "UNDER_REVIEW", ownerId: users.ISSO, reviewDate: daysFromNow(15) },
       { orgId: org.id, title: "AI Governance Policy", framework: "ISO_42001", version: "0.9", status: "DRAFT", ownerId: users.ATO_SME, reviewDate: daysFromNow(30) },
     ],
+  });
+
+  // --- Vendors (third-party risk) ---
+  await prisma.vendor.create({
+    data: {
+      orgId: org.id, vendorNumber: "VEND-0001", name: "Amazon Web Services", businessPurpose: "Cloud infrastructure (production hosting)",
+      dataSensitivity: "CONFIDENTIAL", criticality: "CRITICAL", status: "ACTIVE", reviewCadence: "ANNUAL", riskRating: "HIGH",
+      nextReviewDate: daysFromNow(40), hasDpa: true, dpaExpiresAt: daysFromNow(200), ownerId: users.ISSO,
+      reviews: { create: { reviewType: "PERIODIC", status: "COMPLETED", completedAt: daysFromNow(-325), residualRiskRating: "MEDIUM", findings: "SOC 2 Type II reviewed; no exceptions." } },
+      documents: { create: { docType: "SOC2_TYPE2", title: "AWS SOC 2 Type II Report 2025", validUntil: daysFromNow(120) } },
+    },
+  });
+  await prisma.vendor.create({
+    data: {
+      orgId: org.id, vendorNumber: "VEND-0002", name: "Datadog", businessPurpose: "Observability and monitoring",
+      dataSensitivity: "INTERNAL", criticality: "HIGH", status: "ACTIVE", reviewCadence: "ANNUAL", riskRating: "MEDIUM",
+      nextReviewDate: daysFromNow(-10), hasDpa: true, dpaExpiresAt: daysFromNow(15), ownerId: users.ISSO,
+    },
+  });
+  await prisma.vendor.create({
+    data: {
+      orgId: org.id, vendorNumber: "VEND-0003", name: "Acme Payroll", businessPurpose: "HR/payroll processing (PII)",
+      dataSensitivity: "PII", criticality: "HIGH", status: "UNDER_REVIEW", reviewCadence: "ANNUAL", riskRating: "HIGH",
+      nextReviewDate: daysFromNow(20), hasDpa: false, ownerId: users.ATO_SME,
+      reviews: { create: { reviewType: "ONBOARDING", status: "QUESTIONNAIRE_SENT", questionnaireSentAt: daysFromNow(-5), dueDate: daysFromNow(20) } },
+    },
+  });
+
+  // --- Training courses + personnel ---
+  const secAwareness = await prisma.trainingCourse.create({ data: { orgId: org.id, name: "Security Awareness Training", cadenceDays: 365 } });
+  await prisma.trainingCourse.create({ data: { orgId: org.id, name: "Secure SDLC for Engineers", cadenceDays: 365 } });
+
+  const issoPerson = await prisma.personnel.create({
+    data: {
+      orgId: org.id, fullName: "Ivy ISSO", email: "isso@cyberstar.gov", personnelType: "EMPLOYEE", department: "Security",
+      jobTitle: "Compliance Analyst", status: "ACTIVE", bgCheckStatus: "CLEARED", bgCheckDate: daysFromNow(-200), userId: users.ISSO,
+    },
+  });
+  await prisma.trainingAssignment.create({ data: { personnelId: issoPerson.id, courseId: secAwareness.id, status: "COMPLETED", completedAt: daysFromNow(-30), dueDate: daysFromNow(-40) } });
+  await prisma.accessReview.create({ data: { personnelId: issoPerson.id, scope: "Atlas Cloud Platform", status: "CERTIFIED", reviewedAt: daysFromNow(-15), decision: "RETAIN" } });
+
+  const contractor = await prisma.personnel.create({
+    data: {
+      orgId: org.id, fullName: "Carl Contractor", email: "carl@contractor.example", personnelType: "CONTRACTOR", department: "Engineering",
+      jobTitle: "DevOps Contractor", status: "ONBOARDING", bgCheckStatus: "PENDING", startDate: daysFromNow(-3),
+    },
+  });
+  await prisma.trainingAssignment.create({ data: { personnelId: contractor.id, courseId: secAwareness.id, status: "OVERDUE", dueDate: daysFromNow(-5) } });
+  await prisma.onboardingTask.createMany({
+    data: [
+      { personnelId: contractor.id, phase: "ONBOARDING", title: "Sign acceptable use policy", sortOrder: 1, dueDate: daysFromNow(-2) },
+      { personnelId: contractor.id, phase: "ONBOARDING", title: "Provision least-privilege access", sortOrder: 2, dueDate: daysFromNow(2) },
+      { personnelId: contractor.id, phase: "ONBOARDING", title: "Issue managed laptop", done: true, sortOrder: 3 },
+    ],
+  });
+  await prisma.accessReview.create({ data: { personnelId: contractor.id, scope: "GitHub org", status: "PENDING", dueDate: daysFromNow(-1) } });
+
+  // --- Trust Center (published demo) ---
+  await prisma.organization.update({ where: { id: org.id }, data: { slug: "lustrew" } });
+  const trustCenter = await prisma.trustCenter.create({
+    data: {
+      orgId: org.id, published: true, companyName: "Lustrew Dynamics",
+      headline: "Security and compliance you can verify.",
+      overview: "Lustrew Dynamics maintains a comprehensive security program aligned to SOC 2, ISO 27001, and NIST 800-53. We enforce MFA, least-privilege access, encryption in transit and at rest, continuous controls monitoring, and a formal incident response program.",
+      frameworks: JSON.stringify(["SOC 2", "ISO 27001", "NIST 800-53"]),
+      subprocessors: JSON.stringify([
+        { name: "Amazon Web Services", purpose: "Cloud infrastructure", location: "United States" },
+        { name: "Datadog", purpose: "Monitoring", location: "United States" },
+      ]),
+      statusUrl: "https://status.lustrewdynamics.com", contactEmail: "security@lustrewdynamics.com",
+    },
+  });
+  await prisma.trustDocument.createMany({
+    data: [
+      { trustCenterId: trustCenter.id, orgId: org.id, title: "SOC 2 Type II Report", category: "SOC2", visibility: "GATED", requiresNda: true },
+      { trustCenterId: trustCenter.id, orgId: org.id, title: "ISO 27001 Certificate", category: "ISO_CERT", visibility: "PUBLIC", requiresNda: false },
+      { trustCenterId: trustCenter.id, orgId: org.id, title: "Penetration Test Summary 2026", category: "PENTEST", visibility: "GATED", requiresNda: true },
+    ],
+  });
+
+  // --- Questionnaire answer library ---
+  await prisma.answerLibraryEntry.createMany({
+    data: [
+      { orgId: org.id, question: "Do you enforce multi-factor authentication for all users?", answer: "Yes. MFA is enforced for all users via conditional access policies and is continuously monitored.", category: "Access Control" },
+      { orgId: org.id, question: "Is data encrypted at rest and in transit?", answer: "Yes. All data is encrypted at rest (AES-256) and in transit (TLS 1.2+).", category: "Encryption" },
+      { orgId: org.id, question: "Do you have an incident response plan?", answer: "Yes. We maintain a documented incident response plan that is reviewed at least annually and tested periodically.", category: "Incident Response" },
+      { orgId: org.id, question: "How do you manage third-party/vendor risk?", answer: "We maintain a vendor inventory with risk ratings, conduct security reviews on a defined cadence, and track SOC 2/ISO evidence and DPAs.", category: "Vendor Management" },
+      { orgId: org.id, question: "Do you perform background checks on employees?", answer: "Yes. Background checks are performed on personnel prior to access to sensitive systems, subject to applicable law.", category: "Personnel" },
+      { orgId: org.id, question: "Are access reviews performed regularly?", answer: "Yes. User access reviews are performed at least quarterly and access is provisioned on a least-privilege basis.", category: "Access Control" },
+    ],
+  });
+
+  // --- External auditor + scoped engagement on Atlas ---
+  const externalAuditor = await prisma.user.create({
+    data: {
+      email: "auditor@external-firm.example", name: "Dana External", role: "ASSESSOR", isExternal: true,
+      passwordHash, orgId: org.id,
+    },
+  });
+  await prisma.auditEngagement.create({
+    data: {
+      orgId: org.id, systemId: atlas.id, auditorId: externalAuditor.id, invitedById: users.ADMIN,
+      title: "FY26 SOC 2 examination", status: "ACTIVE",
+      scopes: JSON.stringify(["controls", "evidence", "poams", "risks"]),
+      expiresAt: daysFromNow(60),
+    },
   });
 
   await prisma.auditEvent.create({

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { currentUser, type SessionUser } from "./auth";
 import { can, type Action, type Entity } from "./rbac";
 import { logger } from "./logger";
+import { prisma } from "./db";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -15,6 +16,40 @@ export async function requireUser(): Promise<SessionUser> {
   const user = await currentUser();
   if (!user) throw new HttpError(401, "Not authenticated");
   return user;
+}
+
+/**
+ * System-level scoping for external auditors. Internal users are scoped only at the org level
+ * (returns null = no per-system restriction). An external user (isExternal) is confined to the
+ * systems of their ACTIVE, unexpired AuditEngagement(s).
+ */
+export async function scopedSystemIds(user: SessionUser): Promise<string[] | null> {
+  if (!user.isExternal) return null;
+  const now = new Date();
+  const engagements = await prisma.auditEngagement.findMany({
+    where: { auditorId: user.id, orgId: user.orgId, status: "ACTIVE", expiresAt: { gt: now } },
+    select: { systemId: true },
+  });
+  return engagements.map((e) => e.systemId);
+}
+
+/**
+ * Enforce that the user may access a specific system (and optional scope). Internal users pass the
+ * org check elsewhere; external auditors must have an ACTIVE, unexpired engagement on that system
+ * whose `scopes` include the requested scope. Throws 403 otherwise. Enforced on every request.
+ */
+export async function requireSystemAccess(user: SessionUser, systemId: string, scope?: string): Promise<void> {
+  if (!user.isExternal) return; // internal users are governed by org-scoping + RBAC
+  const now = new Date();
+  const engagement = await prisma.auditEngagement.findFirst({
+    where: { auditorId: user.id, orgId: user.orgId, systemId, status: "ACTIVE", expiresAt: { gt: now } },
+    select: { scopes: true },
+  });
+  if (!engagement) throw new HttpError(403, "No active engagement for this system");
+  if (scope) {
+    const scopes: string[] = JSON.parse(engagement.scopes || "[]");
+    if (!scopes.includes(scope)) throw new HttpError(403, `Engagement does not include ${scope}`);
+  }
 }
 
 /** Resolve the user and enforce an RBAC permission, or throw 401/403. */
